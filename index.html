@@ -460,6 +460,7 @@
     let musicStep = 0;
     let ambientBarkTimer = 0;
     let ambientShoutTimer = 0;
+    let ambientHornTimer = 0;
 
     const specialMessages = [
       "Wrong-side rider spotted!",
@@ -547,8 +548,9 @@
       skidOffset = 0;
       musicTimer = 0;
       musicStep = 0;
-      ambientBarkTimer = ambientBarkDelay();
+      ambientBarkTimer = 3 + Math.random() * 5;
       ambientShoutTimer = ambientShoutDelay();
+      ambientHornTimer = ambientHornDelay();
       hitTimer = 0;
       brakeTimer = 0;
       messageText = "";
@@ -574,7 +576,6 @@
       gameOverScreen.classList.add("hidden");
       lastTime = performance.now();
       playSound("toggle");
-      announceGameStart();
     }
 
     function endGame() {
@@ -709,27 +710,35 @@
         setTimeout(() => playTone(742, 0.18, "triangle", 0.06, 990), 260);
       } else if (name === "toggle") {
         playTone(520, 0.08, "sine", 0.035, 700);
-      } else if (name === "announcement") {
-        playTone(196, 0.1, "triangle", 0.05, 294);
-        setTimeout(() => playTone(294, 0.12, "triangle", 0.05, 392), 120);
       } else if (name === "bark") {
-        playTone(210, 0.08, "sawtooth", 0.06, 135);
-        playNoise(0.055, 0.026);
+        playTone(210, 0.08, "sawtooth", 0.07, 135);
+        playNoise(0.055, 0.032);
         setTimeout(() => {
-          playTone(270, 0.07, "square", 0.05, 165);
-          playNoise(0.05, 0.022);
+          playTone(270, 0.07, "square", 0.06, 165);
+          playNoise(0.05, 0.026);
         }, 105);
       } else if (name === "shout") {
         playAmbientShout();
+      } else if (name === "horn") {
+        playTone(392, 0.18, "square", 0.06, 392);
+        playTone(523.25, 0.18, "sawtooth", 0.035, 523.25);
+        setTimeout(() => {
+          playTone(392, 0.16, "square", 0.052, 392);
+          playTone(493.88, 0.16, "sawtooth", 0.032, 493.88);
+        }, 210);
       }
     }
 
     function ambientBarkDelay() {
-      return 7 + Math.random() * 10;
+      return 6 + Math.random() * 9;
     }
 
     function ambientShoutDelay() {
       return 9 + Math.random() * 13;
+    }
+
+    function ambientHornDelay() {
+      return 4.8 + Math.random() * 7.5;
     }
 
     function playShoutTone() {
@@ -761,6 +770,7 @@
 
       ambientBarkTimer -= dt;
       ambientShoutTimer -= dt;
+      ambientHornTimer -= dt;
 
       if (ambientBarkTimer <= 0) {
         playSound("bark");
@@ -770,6 +780,11 @@
       if (ambientShoutTimer <= 0) {
         playSound("shout");
         ambientShoutTimer = ambientShoutDelay();
+      }
+
+      if (ambientHornTimer <= 0) {
+        playSound("horn");
+        ambientHornTimer = ambientHornDelay();
       }
     }
 
@@ -781,58 +796,38 @@
         null;
     }
 
-    function announceGameStart(retry = false) {
-      if (muted) return;
-      if ("speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-        const voices = window.speechSynthesis.getVoices();
-        if (!voices.length && !retry) {
-          setTimeout(() => announceGameStart(true), 180);
-          return;
-        }
-        const utterance = new SpeechSynthesisUtterance("Auto Mayhem");
-        const indianVoice = getIndianVoice();
-        if (indianVoice) utterance.voice = indianVoice;
-        utterance.lang = indianVoice ? indianVoice.lang : "en-IN";
-        utterance.rate = 0.96;
-        utterance.pitch = 0.92;
-        utterance.volume = 0.82;
-        window.speechSynthesis.speak(utterance);
-      } else {
-        playSound("announcement");
-      }
-    }
-
     function updateMusic(dt) {
       if (muted || gameState !== "playing") return;
       musicTimer -= dt;
       if (musicTimer > 0) return;
 
-      const bassNotes = [82.41, 82.41, 98, 82.41, 110, 82.41, 123.47, 98];
-      const arpNotes = [329.63, 392, 493.88, 392, 329.63, 293.66, 246.94, 293.66, 329.63, 392, 523.25, 392, 329.63, 293.66, 220, 246.94];
-      const step = musicStep % arpNotes.length;
+      const melody = [293.66, 329.63, 369.99, 440, 493.88, 440, 369.99, 329.63, 293.66, 246.94, 293.66, 329.63, 369.99, 329.63, 293.66, 246.94];
+      const bass = [73.42, 73.42, 98, 73.42, 110, 98, 73.42, 65.41];
+      const step = musicStep % melody.length;
       const beat = musicStep % 8;
-      const tempo = peakModeTimer > 0 ? 0.082 : 0.098;
-
-      if (beat === 0 || beat === 4) {
-        const bass = bassNotes[beat];
-        playTone(bass, 0.22, "sawtooth", 0.045, bass * 0.985);
-      } else if (beat === 2 || beat === 6) {
-        const bass = bassNotes[beat] * 0.5;
-        playTone(bass, 0.16, "triangle", 0.026, bass * 1.02);
-      }
+      const tempo = peakModeTimer > 0 ? 0.088 : 0.106;
 
       if (step % 8 === 0) {
-        playTone(164.81, 0.62, "triangle", 0.018, 164.81);
-        playTone(246.94, 0.62, "sine", 0.012, 246.94);
+        playTone(146.83, 0.72, "sine", 0.022, 146.83);
+        playTone(220, 0.72, "triangle", 0.015, 220);
       }
 
-      playTone(arpNotes[step], 0.09, "square", 0.026, arpNotes[step] * 1.006);
-      if (step % 4 === 2) {
-        playTone(arpNotes[step] * 1.5, 0.075, "triangle", 0.015, arpNotes[step] * 1.54);
+      if (beat === 0 || beat === 4) {
+        playTone(bass[beat], 0.18, "triangle", 0.05, bass[beat] * 0.94);
+        playNoise(0.045, 0.018);
+      } else if (beat === 2 || beat === 6) {
+        playTone(185, 0.055, "sine", 0.045, 135);
+        playNoise(0.035, 0.015);
+      } else if (beat === 3 || beat === 7) {
+        playTone(246.94, 0.045, "triangle", 0.032, 285);
       }
-      if (step % 2 === 1) {
-        playTone(arpNotes[step] * 2, 0.035, "square", 0.006, arpNotes[step] * 2.01);
+
+      playTone(melody[step], 0.12, "sawtooth", 0.03, melody[step] * 1.015);
+      if (step % 4 === 1) {
+        playTone(melody[step] * 1.5, 0.08, "triangle", 0.014, melody[step] * 1.48);
+      }
+      if (step % 8 === 6) {
+        playTone(587.33, 0.11, "square", 0.012, 554.37);
       }
 
       musicStep += 1;
