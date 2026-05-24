@@ -62,7 +62,7 @@
       left: 11%;
       right: 11%;
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       gap: 6px;
       pointer-events: none;
       z-index: 2;
@@ -280,7 +280,6 @@
 
     <section class="hud" aria-live="polite">
       <div class="stat"><span>Score</span><strong id="score">0</strong></div>
-      <div class="stat"><span>Lives</span><strong id="lives">3</strong></div>
       <div class="stat"><span>Traffic</span><strong id="level">1</strong></div>
       <div id="chaosStat" class="stat chaos-stat"><span>Chaos Meter</span><strong id="chaos">0%</strong></div>
       <div class="stat"><span>Combo</span><strong id="combo">x1</strong></div>
@@ -319,7 +318,6 @@
     const GAME_VERSION = "V3";
 
     const scoreEl = document.getElementById("score");
-    const livesEl = document.getElementById("lives");
     const levelEl = document.getElementById("level");
     const chaosStatEl = document.getElementById("chaosStat");
     const chaosEl = document.getElementById("chaos");
@@ -533,7 +531,6 @@
 
     function updateHud() {
       scoreEl.textContent = Math.floor(score);
-      livesEl.textContent = lives;
       levelEl.textContent = trafficLevel;
       chaosEl.textContent = `${Math.floor(chaosMeter)}%`;
       chaosStatEl.style.setProperty("--chaos-fill", `${Math.floor(chaosMeter)}%`);
