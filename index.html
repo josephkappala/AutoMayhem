@@ -362,18 +362,6 @@
       { name: "TEMPO", color: "#22c55e", roof: "#dcfce7", w: 0.72, h: 1.12, weave: 0.07 }
     ];
 
-    const shopTypes = [
-      { label: "TEA", color: "#ef4444", roof: "#facc15" },
-      { label: "DOSA", color: "#f97316", roof: "#22c55e" },
-      { label: "BAKERY", color: "#ec4899", roof: "#fde68a" },
-      { label: "MOBILE\nREPAIR", color: "#2563eb", roof: "#bae6fd" },
-      { label: "DARSHINI", color: "#16a34a", roof: "#facc15" },
-      { label: "JUICE", color: "#84cc16", roof: "#fb923c" },
-      { label: "METRO", color: "#64748b", roof: "#38bdf8" },
-      { label: "PETROL", color: "#0f766e", roof: "#f8fafc" },
-      { label: "OFFICE", color: "#7c3aed", roof: "#c4b5fd" }
-    ];
-
     function resizeCanvas() {
       const rect = canvas.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
@@ -1052,73 +1040,20 @@
     }
 
     function drawCityEdges() {
-      ctx.fillStyle = "#57c785";
+      ctx.fillStyle = "#66c98a";
       ctx.fillRect(0, 0, width, height);
 
-      ctx.fillStyle = "rgba(255, 246, 214, 0.38)";
+      ctx.fillStyle = "#8ee3a1";
       ctx.fillRect(0, 0, roadLeft - 12, height);
       ctx.fillRect(roadLeft + roadWidth + 12, 0, width - roadLeft - roadWidth - 12, height);
 
-      let edgeIndex = 0;
-      for (let y = -90 + roadOffset * 0.45; y < height + 120; y += 86) {
-        drawRoadsideShop(8, y, edgeIndex, false);
-        drawRoadsideShop(width - roadLeft + 8, y + 43, edgeIndex + 4, true);
-        edgeIndex += 1;
-      }
-    }
+      ctx.fillStyle = "#2f7d5c";
+      ctx.fillRect(Math.max(0, roadLeft - 18), 0, 6, height);
+      ctx.fillRect(roadLeft + roadWidth + 12, 0, 6, height);
 
-    function drawRoadsideShop(x, y, index, flip) {
-      const areaW = Math.max(38, roadLeft - 18);
-      if (areaW < 32) return;
-      const shop = shopTypes[index % shopTypes.length];
-      const shopW = Math.min(areaW, 72);
-      const shopH = 48;
-
-      ctx.save();
-      ctx.translate(x + areaW / 2, y + shopH / 2);
-      if (flip) ctx.scale(-1, 1);
-
-      ctx.fillStyle = "rgba(15, 23, 42, 0.22)";
-      ctx.fillRect(-shopW / 2 + 4, -shopH / 2 + 5, shopW, shopH);
-      ctx.fillStyle = "#fff7ed";
-      roundRect(-shopW / 2, -shopH / 2, shopW, shopH, 4);
-      ctx.fill();
-
-      ctx.fillStyle = shop.roof;
-      ctx.fillRect(-shopW / 2, -shopH / 2, shopW, 12);
-      ctx.fillStyle = shop.color;
-      ctx.fillRect(-shopW / 2 + 3, -shopH / 2 + 14, shopW - 6, 18);
-
-      ctx.save();
-      if (flip) ctx.scale(-1, 1);
-      ctx.fillStyle = "#ffffff";
-      ctx.font = `900 ${shop.label.length > 8 ? 8 : 10}px system-ui, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      const lines = shop.label.split("\n");
-      for (let i = 0; i < lines.length; i++) {
-        ctx.fillText(lines[i], 0, -4 + i * 9);
-      }
-      ctx.restore();
-
-      ctx.fillStyle = "#172554";
-      ctx.fillRect(-shopW / 2 + 8, shopH / 2 - 13, 10, 13);
-      ctx.fillStyle = "#334155";
-      ctx.fillRect(shopW / 2 - 20, shopH / 2 - 12, 12, 8);
-
-      if (shop.label === "METRO") {
-        ctx.fillStyle = "#94a3b8";
-        ctx.fillRect(-5, -shopH / 2 - 28, 10, 28);
-        ctx.fillStyle = "#2563eb";
-        ctx.fillRect(-19, -shopH / 2 - 34, 38, 8);
-      } else if (shop.label === "PETROL") {
-        ctx.fillStyle = "#111827";
-        ctx.fillRect(shopW / 2 - 10, -shopH / 2 - 18, 5, 18);
-        ctx.fillStyle = "#facc15";
-        ctx.fillRect(shopW / 2 - 22, -shopH / 2 - 30, 28, 14);
-      }
-
-      ctx.restore();
+      ctx.fillStyle = "rgba(255, 246, 214, 0.42)";
+      ctx.fillRect(0, 0, Math.max(0, roadLeft - 24), height);
+      ctx.fillRect(roadLeft + roadWidth + 24, 0, Math.max(0, width - roadLeft - roadWidth - 24), height);
     }
 
     function drawPedestrians() {
