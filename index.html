@@ -458,6 +458,8 @@
     let muted = false;
     let musicTimer = 0;
     let musicStep = 0;
+    let ambientBarkTimer = 0;
+    let ambientShoutTimer = 0;
 
     const specialMessages = [
       "Wrong-side rider spotted!",
@@ -545,6 +547,8 @@
       skidOffset = 0;
       musicTimer = 0;
       musicStep = 0;
+      ambientBarkTimer = ambientBarkDelay();
+      ambientShoutTimer = ambientShoutDelay();
       hitTimer = 0;
       brakeTimer = 0;
       messageText = "";
@@ -708,6 +712,64 @@
       } else if (name === "announcement") {
         playTone(196, 0.1, "triangle", 0.05, 294);
         setTimeout(() => playTone(294, 0.12, "triangle", 0.05, 392), 120);
+      } else if (name === "bark") {
+        playTone(210, 0.08, "sawtooth", 0.06, 135);
+        playNoise(0.055, 0.026);
+        setTimeout(() => {
+          playTone(270, 0.07, "square", 0.05, 165);
+          playNoise(0.05, 0.022);
+        }, 105);
+      } else if (name === "shout") {
+        playAmbientShout();
+      }
+    }
+
+    function ambientBarkDelay() {
+      return 7 + Math.random() * 10;
+    }
+
+    function ambientShoutDelay() {
+      return 9 + Math.random() * 13;
+    }
+
+    function playShoutTone() {
+      playTone(520, 0.07, "sawtooth", 0.032, 650);
+      setTimeout(() => playTone(390, 0.09, "square", 0.028, 315), 75);
+      setTimeout(() => playNoise(0.08, 0.018), 35);
+    }
+
+    function playAmbientShout() {
+      if (muted) return;
+      if ("speechSynthesis" in window && !window.speechSynthesis.speaking) {
+        const phrases = ["Ayyo!", "Side side!", "Careful!", "Oye!", "Meter running!"];
+        const utterance = new SpeechSynthesisUtterance(phrases[Math.floor(Math.random() * phrases.length)]);
+        const indianVoice = getIndianVoice();
+        if (indianVoice) utterance.voice = indianVoice;
+        utterance.lang = indianVoice ? indianVoice.lang : "en-IN";
+        utterance.rate = 1.12;
+        utterance.pitch = 1.25;
+        utterance.volume = 0.55;
+        utterance.onerror = playShoutTone;
+        window.speechSynthesis.speak(utterance);
+      } else {
+        playShoutTone();
+      }
+    }
+
+    function updateAmbientAudio(dt) {
+      if (muted || gameState !== "playing") return;
+
+      ambientBarkTimer -= dt;
+      ambientShoutTimer -= dt;
+
+      if (ambientBarkTimer <= 0) {
+        playSound("bark");
+        ambientBarkTimer = ambientBarkDelay();
+      }
+
+      if (ambientShoutTimer <= 0) {
+        playSound("shout");
+        ambientShoutTimer = ambientShoutDelay();
       }
     }
 
@@ -1201,6 +1263,7 @@
         addChaos(dt * (0.42 + trafficLevel * 0.07));
       }
       updateMusic(dt);
+      updateAmbientAudio(dt);
       hitTimer = Math.max(0, hitTimer - dt);
       brakeTimer = Math.max(0, brakeTimer - dt);
       messageTimer = Math.max(0, messageTimer - dt);
