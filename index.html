@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auto Mayhem: Silk Board Run</title>
+  <style>
+    :root {
+      --ink: #17202a;
+      --cream: #fff6d6;
+      --auto-yellow: #ffcf24;
+      --auto-green: #2fb85e;
+      --signal-red: #ef4444;
+      --signal-orange: #fb923c;
+      --signal-blue: #2563eb;
+      --road: #38414a;
+      --road-edge: #22272e;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 12% 16%, rgba(255, 207, 36, 0.35), transparent 24%),
+        radial-gradient(circle at 86% 20%, rgba(239, 68, 68, 0.3), transparent 28%),
+        radial-gradient(circle at 78% 82%, rgba(34, 197, 94, 0.28), transparent 30%),
+        linear-gradient(135deg, #ffedd5 0%, #fef08a 32%, #7dd3fc 64%, #86efac 100%);
+      color: var(--ink);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+
+    .shell {
+      width: min(96vw, 560px);
+      height: min(96vh, 860px);
+      min-height: 560px;
+      position: relative;
+      border: 4px solid #111827;
+      border-radius: 18px;
+      overflow: hidden;
+      background: #111827;
+      box-shadow: 0 24px 70px rgba(15, 23, 42, 0.38);
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: #111827;
+      touch-action: manipulation;
+    }
+
+    .hud {
+      position: absolute;
+      inset: 12px 12px auto 12px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .stat {
+      min-width: 0;
+      padding: 8px 9px;
+      border: 2px solid rgba(17, 24, 39, 0.9);
+      border-radius: 8px;
+      background: #fff6d6;
+      box-shadow: 0 3px 0 rgba(17, 24, 39, 0.85);
+      text-align: center;
+    }
+
+    .stat span {
+      display: block;
+      color: #475569;
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+
+    .stat strong {
+      display: block;
+      margin-top: 3px;
+      color: #111827;
+      font-size: clamp(16px, 4vw, 21px);
+      line-height: 1.05;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background: rgba(15, 23, 42, 0.74);
+      z-index: 3;
+    }
+
+    .panel {
+      width: min(100%, 360px);
+      padding: 18px;
+      border: 4px solid #111827;
+      border-radius: 12px;
+      background:
+        linear-gradient(180deg, #fff6d6 0%, #fde68a 100%);
+      box-shadow: 0 6px 0 rgba(17, 24, 39, 0.86);
+      text-align: center;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 6.4vw, 42px);
+      line-height: 0.98;
+      letter-spacing: 0;
+      color: #111827;
+      text-shadow: 3px 3px 0 var(--auto-yellow), 5px 5px 0 #fb923c;
+    }
+
+    .tagline {
+      margin: 0 auto 14px;
+      max-width: 32ch;
+      color: #334155;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+
+    .keys {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 7px;
+      margin: 14px 0;
+    }
+
+    .key {
+      padding: 7px 6px;
+      border: 2px solid #111827;
+      border-radius: 8px;
+      background: #e0f2fe;
+      color: #0f172a;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 4px;
+      padding: 10px 14px;
+      border: 3px solid #111827;
+      border-radius: 8px;
+      background: linear-gradient(180deg, #ffcf24, #fb923c);
+      color: #111827;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 950;
+      box-shadow: 0 5px 0 #111827;
+    }
+
+    button:active {
+      transform: translateY(3px);
+      box-shadow: 0 2px 0 #111827;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .small {
+      margin: 10px 0 0;
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 520px) {
+      .shell {
+        width: 100vw;
+        height: 100vh;
+        min-height: 0;
+        border: 0;
+        border-radius: 0;
+      }
+
+      .hud {
+        inset: 10px 8px auto 8px;
+        gap: 5px;
+      }
+
+      .stat {
+        padding: 7px 5px;
+      }
+
+      .panel {
+        width: min(92vw, 340px);
+        padding: 16px;
+      }
+
+      h1 {
+        font-size: clamp(26px, 9vw, 36px);
+      }
+
+      .tagline {
+        font-size: 13px;
+      }
+
+      .key {
+        font-size: 11px;
+      }
+
+      button {
+        font-size: 15px;
+        padding: 10px 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell" aria-label="Auto Mayhem: Silk Board Run game">
+    <canvas id="game" width="560" height="860"></canvas>
+
+    <section class="hud" aria-live="polite">
+      <div class="stat"><span>Score</span><strong id="score">0</strong></div>
+      <div class="stat"><span>Lives</span><strong id="lives">3</strong></div>
+      <div class="stat"><span>Traffic</span><strong id="level">1</strong></div>
+    </section>
+
+    <section id="startScreen" class="overlay">
+      <div class="panel">
+        <h1>Auto Mayhem:<br>Silk Board Run</h1>
+        <p class="tagline">Dodge buses, cabs, scooters, and road drama in a yellow-green auto.</p>
+        <div class="keys">
+          <div class="key">Left Arrow: lane left</div>
+          <div class="key">Right Arrow: lane right</div>
+          <div class="key">Space / Enter: start</div>
+          <div class="key">P: pause</div>
+        </div>
+        <button id="startButton" type="button">Start Meter</button>
+        <p class="small">Mobile: tap left or right side</p>
+      </div>
+    </section>
+
+    <section id="gameOverScreen" class="overlay hidden">
+      <div class="panel">
+        <h1>Game Over</h1>
+        <p class="tagline">Silk Board claimed another auto.</p>
+        <p class="tagline">Final score: <strong id="finalScore">0</strong></p>
+        <button id="tryAgainButton" type="button">Try Again</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+
+    const scoreEl = document.getElementById("score");
+    const livesEl = document.getElementById("lives");
+    const levelEl = document.getElementById("level");
+    const finalScoreEl = document.getElementById("finalScore");
+    const startScreen = document.getElementById("startScreen");
+    const gameOverScreen = document.getElementById("gameOverScreen");
+    const startButton = document.getElementById("startButton");
+    const tryAgainButton = document.getElementById("tryAgainButton");
+
+    const LANE_COUNT = 4;
+    const START_LIVES = 3;
+    const PLAYER_LANE = 1;
+    const PLAYER_Y_RATIO = 0.78;
+    const LANE_SWITCH_TIME = 0.08;
+
+    let width = 560;
+    let height = 860;
+    let roadLeft = 0;
+    let roadWidth = 0;
+    let laneWidth = 0;
+    let playerLane = PLAYER_LANE;
+    let targetPlayerX = 0;
+    let playerX = 0;
+    let laneStartX = 0;
+    let laneSwitchTimer = 0;
+    let playerY = 0;
+    let playerW = 0;
+    let playerH = 0;
+
+    let vehicles = [];
+    let score = 0;
+    let lives = START_LIVES;
+    let trafficLevel = 1;
+    let roadOffset = 0;
+    let spawnTimer = 0;
+    let hitTimer = 0;
+    let lastTime = 0;
+    let gameState = "start";
+    let nextVehicleId = 1;
+    let animationId = 0;
+
+    const trafficTypes = [
+      { name: "BUS", color: "#ef4444", roof: "#fee2e2", w: 0.72, h: 1.28 },
+      { name: "CAB", color: "#facc15", roof: "#111827", w: 0.64, h: 0.98 },
+      { name: "SCOOTY", color: "#38bdf8", roof: "#0f172a", w: 0.46, h: 0.78 },
+      { name: "VAN", color: "#a78bfa", roof: "#ede9fe", w: 0.68, h: 1.05 },
+      { name: "TEMPO", color: "#22c55e", roof: "#dcfce7", w: 0.72, h: 1.12 }
+    ];
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      width = Math.floor(rect.width);
+      height = Math.floor(rect.height);
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      roadWidth = width * 0.78;
+      roadLeft = (width - roadWidth) / 2;
+      laneWidth = roadWidth / LANE_COUNT;
+      playerW = laneWidth * 0.58;
+      playerH = playerW * 1.46;
+      playerY = height * PLAYER_Y_RATIO;
+      targetPlayerX = laneCenter(playerLane);
+      if (!playerX) {
+        playerX = targetPlayerX;
+        laneStartX = targetPlayerX;
+      }
+    }
+
+    function laneCenter(lane) {
+      return roadLeft + laneWidth * lane + laneWidth / 2;
+    }
+
+    function resetGame() {
+      vehicles = [];
+      score = 0;
+      lives = START_LIVES;
+      trafficLevel = 1;
+      roadOffset = 0;
+      spawnTimer = 0.65;
+      hitTimer = 0;
+      playerLane = PLAYER_LANE;
+      targetPlayerX = laneCenter(playerLane);
+      playerX = targetPlayerX;
+      laneStartX = targetPlayerX;
+      laneSwitchTimer = 0;
+      nextVehicleId = 1;
+      updateHud();
+    }
+
+    function startGame() {
+      resetGame();
+      gameState = "playing";
+      startScreen.classList.add("hidden");
+      gameOverScreen.classList.add("hidden");
+      lastTime = performance.now();
+    }
+
+    function endGame() {
+      gameState = "over";
+      finalScoreEl.textContent = Math.floor(score);
+      gameOverScreen.classList.remove("hidden");
+    }
+
+    function togglePause() {
+      if (gameState === "playing") {
+        gameState = "paused";
+      } else if (gameState === "paused") {
+        gameState = "playing";
+        lastTime = performance.now();
+      }
+    }
+
+    function moveLane(direction) {
+      if (gameState !== "playing") return;
+      const nextLane = Math.max(0, Math.min(LANE_COUNT - 1, playerLane + direction));
+      if (nextLane === playerLane) return;
+
+      playerLane = nextLane;
+      laneStartX = playerX;
+      targetPlayerX = laneCenter(playerLane);
+      laneSwitchTimer = LANE_SWITCH_TIME;
+    }
+
+    function updateHud() {
+      scoreEl.textContent = Math.floor(score);
+      livesEl.textContent = lives;
+      levelEl.textContent = trafficLevel;
+    }
+
+    function spawnVehicle() {
+      const type = trafficTypes[Math.floor(Math.random() * trafficTypes.length)];
+      const lane = Math.floor(Math.random() * LANE_COUNT);
+      const w = laneWidth * type.w;
+      const h = laneWidth * type.h;
+      const minGap = laneWidth * 1.75;
+      const blocked = vehicles.some(vehicle => vehicle.lane === lane && vehicle.y < minGap);
+
+      if (blocked && Math.random() < 0.78) return;
+
+      vehicles.push({
+        id: nextVehicleId++,
+        lane,
+        x: laneCenter(lane),
+        y: -h - 10,
+        w,
+        h,
+        type,
+        passed: false,
+        speedBoost: 0.88 + Math.random() * 0.36
+      });
+    }
+
+    function update(dt) {
+      const speed = 235 + trafficLevel * 34;
+      roadOffset = (roadOffset + speed * dt) % 58;
+      score += dt * 8;
+      trafficLevel = Math.min(9, 1 + Math.floor(score / 260));
+      hitTimer = Math.max(0, hitTimer - dt);
+
+      updatePlayerPosition(dt);
+
+      spawnTimer -= dt;
+      if (spawnTimer <= 0) {
+        spawnVehicle();
+        const pressure = Math.max(0.34, 1.04 - trafficLevel * 0.075);
+        spawnTimer = pressure + Math.random() * 0.34;
+      }
+
+      for (const vehicle of vehicles) {
+        vehicle.y += speed * vehicle.speedBoost * dt;
+
+        if (!vehicle.passed && vehicle.y > playerY + playerH * 0.5) {
+          vehicle.passed = true;
+          score += 10;
+        }
+      }
+
+      vehicles = vehicles.filter(vehicle => vehicle.y < height + vehicle.h + 50);
+      checkCollisions();
+      updateHud();
+    }
+
+    function updatePlayerPosition(dt) {
+      if (laneSwitchTimer <= 0) {
+        playerX = targetPlayerX;
+        return;
+      }
+
+      laneSwitchTimer = Math.max(0, laneSwitchTimer - dt);
+      const progress = 1 - laneSwitchTimer / LANE_SWITCH_TIME;
+      const eased = 1 - Math.pow(1 - progress, 3);
+      playerX = laneStartX + (targetPlayerX - laneStartX) * eased;
+
+      if (laneSwitchTimer === 0) {
+        playerX = targetPlayerX;
+      }
+    }
+
+    function checkCollisions() {
+      if (hitTimer > 0) return;
+
+      const playerBox = {
+        left: targetPlayerX - playerW * 0.39,
+        right: targetPlayerX + playerW * 0.39,
+        top: playerY - playerH * 0.43,
+        bottom: playerY + playerH * 0.43
+      };
+
+      for (let i = 0; i < vehicles.length; i++) {
+        const vehicle = vehicles[i];
+        const box = {
+          left: vehicle.x - vehicle.w * 0.42,
+          right: vehicle.x + vehicle.w * 0.42,
+          top: vehicle.y - vehicle.h * 0.44,
+          bottom: vehicle.y + vehicle.h * 0.44
+        };
+
+        const hit = playerBox.left < box.right &&
+          playerBox.right > box.left &&
+          playerBox.top < box.bottom &&
+          playerBox.bottom > box.top;
+
+        if (hit) {
+          lives -= 1;
+          hitTimer = 1.05;
+          vehicles.splice(i, 1);
+          shakeRoad();
+          if (lives <= 0) endGame();
+          break;
+        }
+      }
+    }
+
+    function shakeRoad() {
+      canvas.style.transform = "translateX(-7px)";
+      setTimeout(() => canvas.style.transform = "translateX(7px)", 45);
+      setTimeout(() => canvas.style.transform = "translateX(0)", 90);
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, width, height);
+      drawCityEdges();
+      drawRoad();
+      drawVehicles();
+      drawPlayer();
+      drawBanners();
+
+      if (gameState === "paused") {
+        drawPause();
+      }
+    }
+
+    function drawCityEdges() {
+      ctx.fillStyle = "#57c785";
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.fillStyle = "rgba(255, 246, 214, 0.38)";
+      ctx.fillRect(0, 0, roadLeft - 12, height);
+      ctx.fillRect(roadLeft + roadWidth + 12, 0, width - roadLeft - roadWidth - 12, height);
+
+      let edgeIndex = 0;
+      for (let y = -40; y < height + 80; y += 96) {
+        drawRoadsideGraphic(8, y + (roadOffset * 0.35), edgeIndex % 3, false);
+        drawRoadsideGraphic(width - roadLeft + 8, y + 48 + (roadOffset * 0.35), (edgeIndex + 1) % 3, true);
+        edgeIndex += 1;
+      }
+    }
+
+    function drawRoadsideGraphic(x, y, variant, flip) {
+      const areaW = Math.max(38, roadLeft - 18);
+      if (areaW < 32) return;
+
+      ctx.save();
+      ctx.translate(x + areaW / 2, y + 26);
+      if (flip) ctx.scale(-1, 1);
+
+      if (variant === 0) {
+        drawUmbrellaCart(areaW);
+      } else if (variant === 1) {
+        drawMiniBuilding(areaW);
+      } else {
+        drawParkedScooter(areaW);
+      }
+
+      ctx.restore();
+    }
+
+    function drawUmbrellaCart(areaW) {
+      const poleH = 26;
+      ctx.fillStyle = "#7c2d12";
+      ctx.fillRect(-2, -14, 4, poleH);
+
+      ctx.fillStyle = "#ef4444";
+      ctx.beginPath();
+      ctx.arc(0, -15, Math.min(24, areaW * 0.34), Math.PI, 0);
+      ctx.lineTo(0, -15);
+      ctx.fill();
+
+      ctx.fillStyle = "#facc15";
+      ctx.beginPath();
+      ctx.moveTo(-5, -15);
+      ctx.lineTo(0, -39);
+      ctx.lineTo(5, -15);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = "#0f766e";
+      roundRect(-22, 8, 44, 16, 4);
+      ctx.fill();
+      ctx.fillStyle = "#111827";
+      ctx.beginPath();
+      ctx.arc(-14, 25, 5, 0, Math.PI * 2);
+      ctx.arc(14, 25, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawMiniBuilding(areaW) {
+      const buildingW = Math.min(44, areaW * 0.72);
+      ctx.fillStyle = "#f8fafc";
+      roundRect(-buildingW / 2, -24, buildingW, 48, 4);
+      ctx.fill();
+
+      ctx.fillStyle = "#2563eb";
+      ctx.fillRect(-buildingW / 2, -24, buildingW, 10);
+      ctx.fillStyle = "#0f172a";
+      for (let row = 0; row < 2; row++) {
+        for (let col = 0; col < 3; col++) {
+          ctx.fillRect(-buildingW / 2 + 7 + col * 12, -8 + row * 14, 7, 7);
+        }
+      }
+
+      ctx.fillStyle = "#22c55e";
+      ctx.beginPath();
+      ctx.arc(-buildingW / 2 - 8, 15, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#854d0e";
+      ctx.fillRect(-buildingW / 2 - 10, 20, 4, 13);
+    }
+
+    function drawParkedScooter(areaW) {
+      const scooterW = Math.min(48, areaW * 0.78);
+      ctx.strokeStyle = "#111827";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-scooterW * 0.28, 7);
+      ctx.quadraticCurveTo(-6, -10, scooterW * 0.23, 4);
+      ctx.lineTo(scooterW * 0.35, -15);
+      ctx.stroke();
+
+      ctx.fillStyle = "#f97316";
+      roundRect(-scooterW * 0.24, -5, scooterW * 0.48, 16, 6);
+      ctx.fill();
+      ctx.fillStyle = "#111827";
+      ctx.beginPath();
+      ctx.arc(-scooterW * 0.33, 15, 8, 0, Math.PI * 2);
+      ctx.arc(scooterW * 0.33, 15, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#e0f2fe";
+      ctx.beginPath();
+      ctx.arc(-scooterW * 0.33, 15, 3, 0, Math.PI * 2);
+      ctx.arc(scooterW * 0.33, 15, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawRoad() {
+      ctx.fillStyle = "#22272e";
+      ctx.fillRect(roadLeft - 10, 0, roadWidth + 20, height);
+
+      ctx.fillStyle = "#38414a";
+      ctx.fillRect(roadLeft, 0, roadWidth, height);
+
+      ctx.fillStyle = "rgba(251, 191, 36, 0.18)";
+      ctx.fillRect(roadLeft + laneWidth * 0.2, 0, laneWidth * 0.12, height);
+      ctx.fillStyle = "rgba(56, 189, 248, 0.14)";
+      ctx.fillRect(roadLeft + laneWidth * 2.55, 0, laneWidth * 0.16, height);
+
+      ctx.strokeStyle = "#f8fafc";
+      ctx.lineWidth = 3;
+
+      for (let lane = 1; lane < LANE_COUNT; lane++) {
+        const x = roadLeft + lane * laneWidth;
+        ctx.beginPath();
+        ctx.moveTo(x, -60);
+        ctx.lineTo(x, height + 60);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = "#facc15";
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.moveTo(roadLeft, 0);
+      ctx.lineTo(roadLeft, height);
+      ctx.moveTo(roadLeft + roadWidth, 0);
+      ctx.lineTo(roadLeft + roadWidth, height);
+      ctx.stroke();
+
+      for (let y = -40 + roadOffset; y < height + 70; y += 116) {
+        drawPothole(roadLeft + laneWidth * 0.52, y);
+        drawCone(roadLeft + laneWidth * 3.52, y + 55);
+      }
+    }
+
+    function drawPothole(x, y) {
+      ctx.fillStyle = "rgba(15, 23, 42, 0.5)";
+      ctx.beginPath();
+      ctx.ellipse(x, y, 14, 8, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawCone(x, y) {
+      ctx.fillStyle = "#fb923c";
+      ctx.beginPath();
+      ctx.moveTo(x, y - 14);
+      ctx.lineTo(x - 11, y + 12);
+      ctx.lineTo(x + 11, y + 12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(x - 7, y + 3, 14, 4);
+    }
+
+    function drawBanners() {
+      ctx.save();
+      ctx.translate(width / 2, 118);
+      ctx.rotate(-0.05);
+      ctx.fillStyle = "rgba(255, 246, 214, 0.92)";
+      ctx.strokeStyle = "#111827";
+      ctx.lineWidth = 2;
+      roundRect(-115, -17, 230, 34, 7);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#111827";
+      ctx.font = "900 13px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("SILK BOARD FLYOVER AHEAD", 0, 0);
+      ctx.restore();
+    }
+
+    function drawVehicles() {
+      for (const vehicle of vehicles) {
+        drawTrafficVehicle(vehicle);
+      }
+    }
+
+    function drawTrafficVehicle(vehicle) {
+      const x = vehicle.x;
+      const y = vehicle.y;
+      const w = vehicle.w;
+      const h = vehicle.h;
+      const type = vehicle.type;
+
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.fillStyle = "rgba(0, 0, 0, 0.24)";
+      ctx.beginPath();
+      ctx.ellipse(0, h * 0.43, w * 0.43, h * 0.12, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = type.color;
+      roundRect(-w / 2, -h / 2, w, h, 8);
+      ctx.fill();
+
+      ctx.fillStyle = type.roof;
+      roundRect(-w * 0.33, -h * 0.26, w * 0.66, h * 0.38, 5);
+      ctx.fill();
+
+      ctx.fillStyle = "#111827";
+      ctx.font = `900 ${Math.max(10, w * 0.18)}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(type.name, 0, h * 0.23);
+
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillRect(-w * 0.36, -h * 0.44, w * 0.18, h * 0.08);
+      ctx.fillRect(w * 0.18, -h * 0.44, w * 0.18, h * 0.08);
+      ctx.fillStyle = "#111827";
+      ctx.fillRect(-w * 0.52, -h * 0.32, w * 0.1, h * 0.22);
+      ctx.fillRect(w * 0.42, -h * 0.32, w * 0.1, h * 0.22);
+      ctx.fillRect(-w * 0.52, h * 0.13, w * 0.1, h * 0.22);
+      ctx.fillRect(w * 0.42, h * 0.13, w * 0.1, h * 0.22);
+      ctx.restore();
+    }
+
+    function drawPlayer() {
+      const flicker = hitTimer > 0 && Math.floor(hitTimer * 16) % 2 === 0;
+      if (flicker) return;
+
+      ctx.save();
+      ctx.translate(playerX, playerY);
+      ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
+      ctx.beginPath();
+      ctx.ellipse(0, playerH * 0.46, playerW * 0.48, playerH * 0.13, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#2fb85e";
+      roundRect(-playerW * 0.5, -playerH * 0.39, playerW, playerH * 0.78, 12);
+      ctx.fill();
+
+      ctx.fillStyle = "#ffcf24";
+      roundRect(-playerW * 0.45, -playerH * 0.5, playerW * 0.9, playerH * 0.36, 10);
+      ctx.fill();
+
+      ctx.fillStyle = "#172554";
+      roundRect(-playerW * 0.31, -playerH * 0.42, playerW * 0.62, playerH * 0.18, 5);
+      ctx.fill();
+
+      ctx.fillStyle = "#111827";
+      ctx.fillRect(-playerW * 0.58, -playerH * 0.22, playerW * 0.12, playerH * 0.34);
+      ctx.fillRect(playerW * 0.46, -playerH * 0.22, playerW * 0.12, playerH * 0.34);
+
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillRect(-playerW * 0.25, playerH * 0.24, playerW * 0.5, playerH * 0.12);
+      ctx.fillStyle = "#111827";
+      ctx.font = `900 ${Math.max(11, playerW * 0.2)}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("AUTO", 0, playerH * 0.3);
+
+      ctx.fillStyle = "#fef3c7";
+      ctx.beginPath();
+      ctx.arc(0, -playerH * 0.05, playerW * 0.13, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawPause() {
+      ctx.fillStyle = "rgba(15, 23, 42, 0.62)";
+      ctx.fillRect(0, 0, width, height);
+      ctx.fillStyle = "#fff6d6";
+      ctx.strokeStyle = "#111827";
+      ctx.lineWidth = 4;
+      roundRect(width / 2 - 120, height / 2 - 42, 240, 84, 10);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#111827";
+      ctx.font = "900 34px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("PAUSED", width / 2, height / 2);
+    }
+
+    function roundRect(x, y, w, h, radius) {
+      const r = Math.min(radius, Math.abs(w) / 2, Math.abs(h) / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+    }
+
+    function loop(now) {
+      const dt = Math.min(0.033, (now - lastTime) / 1000 || 0);
+      lastTime = now;
+
+      if (gameState === "playing") {
+        update(dt);
+      }
+
+      draw();
+      animationId = requestAnimationFrame(loop);
+    }
+
+    window.addEventListener("resize", resizeCanvas);
+
+    window.addEventListener("keydown", event => {
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        moveLane(-1);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        moveLane(1);
+      } else if (event.key === " " || event.key === "Enter") {
+        event.preventDefault();
+        if (gameState === "start" || gameState === "over") startGame();
+      } else if (event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        togglePause();
+      }
+    });
+
+    canvas.addEventListener("pointerdown", event => {
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+
+      if (gameState === "start" || gameState === "over") {
+        startGame();
+        return;
+      }
+
+      if (x < rect.width / 2) {
+        moveLane(-1);
+      } else {
+        moveLane(1);
+      }
+    });
+
+    startButton.addEventListener("click", startGame);
+    tryAgainButton.addEventListener("click", startGame);
+
+    resizeCanvas();
+    updateHud();
+    draw();
+    animationId = requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
