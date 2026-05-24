@@ -393,7 +393,7 @@
     const soundToggle = document.getElementById("soundToggle");
 
     const LANE_COUNT = 4;
-    const START_LIVES = 3;
+    const START_LIVES = 5;
     const PLAYER_LANE = 1;
     const PLAYER_Y_RATIO = 0.78;
     const LANE_SWITCH_TIME = 0.13;
@@ -456,6 +456,8 @@
     let audioContext = null;
     let audioMaster = null;
     let muted = false;
+    let musicTimer = 0;
+    let musicStep = 0;
 
     const specialMessages = [
       "Wrong-side rider spotted!",
@@ -541,6 +543,8 @@
       skidTimer = 0;
       skidVelocity = 0;
       skidOffset = 0;
+      musicTimer = 0;
+      musicStep = 0;
       hitTimer = 0;
       brakeTimer = 0;
       messageText = "";
@@ -566,10 +570,12 @@
       gameOverScreen.classList.add("hidden");
       lastTime = performance.now();
       playSound("toggle");
+      announceGameStart();
     }
 
     function endGame() {
       gameState = "over";
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
       finalScoreEl.textContent = Math.floor(score);
       gameOverMessageEl.textContent = gameOverMessages[Math.floor(Math.random() * gameOverMessages.length)];
       gameOverScreen.classList.remove("hidden");
@@ -634,6 +640,7 @@
       resumeAudio();
       muted = !muted;
       updateSoundButton();
+      if (muted && "speechSynthesis" in window) window.speechSynthesis.cancel();
       if (!muted) playSound("toggle");
     }
 
@@ -698,7 +705,43 @@
         setTimeout(() => playTone(742, 0.18, "triangle", 0.06, 990), 260);
       } else if (name === "toggle") {
         playTone(520, 0.08, "sine", 0.035, 700);
+      } else if (name === "announcement") {
+        playTone(196, 0.1, "triangle", 0.05, 294);
+        setTimeout(() => playTone(294, 0.12, "triangle", 0.05, 392), 120);
       }
+    }
+
+    function announceGameStart() {
+      if (muted) return;
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance("Auto Mayhem");
+        utterance.rate = 1.04;
+        utterance.pitch = 0.88;
+        utterance.volume = 0.75;
+        window.speechSynthesis.speak(utterance);
+      } else {
+        playSound("announcement");
+      }
+    }
+
+    function updateMusic(dt) {
+      if (muted || gameState !== "playing") return;
+      musicTimer -= dt;
+      if (musicTimer > 0) return;
+
+      const bassNotes = [110, 110, 146.83, 110, 164.81, 146.83, 110, 98];
+      const melodyNotes = [0, 440, 0, 493.88, 0, 392, 0, 329.63];
+      const step = musicStep % bassNotes.length;
+      const tempo = peakModeTimer > 0 ? 0.24 : 0.34;
+
+      playTone(bassNotes[step], 0.1, "triangle", 0.018, bassNotes[step] * 0.98);
+      if (melodyNotes[step]) {
+        playTone(melodyNotes[step], 0.08, "square", 0.012, melodyNotes[step] * 1.08);
+      }
+
+      musicStep += 1;
+      musicTimer = tempo;
     }
 
     function addChaos(amount) {
@@ -1124,6 +1167,7 @@
       } else {
         addChaos(dt * (0.42 + trafficLevel * 0.07));
       }
+      updateMusic(dt);
       hitTimer = Math.max(0, hitTimer - dt);
       brakeTimer = Math.max(0, brakeTimer - dt);
       messageTimer = Math.max(0, messageTimer - dt);
