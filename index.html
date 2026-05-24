@@ -78,6 +78,27 @@
       text-align: center;
     }
 
+    .stat.chaos-stat {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat.chaos-stat::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      width: var(--chaos-fill, 0%);
+      background: var(--chaos-color, #22c55e);
+      opacity: 0.55;
+      transition: width 180ms linear, background-color 180ms linear;
+    }
+
+    .stat.chaos-stat span,
+    .stat.chaos-stat strong {
+      position: relative;
+      z-index: 1;
+    }
+
     .stat span {
       display: block;
       color: #475569;
@@ -261,7 +282,7 @@
       <div class="stat"><span>Score</span><strong id="score">0</strong></div>
       <div class="stat"><span>Lives</span><strong id="lives">3</strong></div>
       <div class="stat"><span>Traffic</span><strong id="level">1</strong></div>
-      <div class="stat"><span>Chaos Meter</span><strong id="chaos">0%</strong></div>
+      <div id="chaosStat" class="stat chaos-stat"><span>Chaos Meter</span><strong id="chaos">0%</strong></div>
       <div class="stat"><span>Combo</span><strong id="combo">x1</strong></div>
     </section>
 
@@ -300,6 +321,7 @@
     const scoreEl = document.getElementById("score");
     const livesEl = document.getElementById("lives");
     const levelEl = document.getElementById("level");
+    const chaosStatEl = document.getElementById("chaosStat");
     const chaosEl = document.getElementById("chaos");
     const comboEl = document.getElementById("combo");
     const finalScoreEl = document.getElementById("finalScore");
@@ -514,6 +536,8 @@
       livesEl.textContent = lives;
       levelEl.textContent = trafficLevel;
       chaosEl.textContent = `${Math.floor(chaosMeter)}%`;
+      chaosStatEl.style.setProperty("--chaos-fill", `${Math.floor(chaosMeter)}%`);
+      chaosStatEl.style.setProperty("--chaos-color", chaosMeter < 45 ? "#22c55e" : chaosMeter < 75 ? "#facc15" : "#ef4444");
       comboEl.textContent = `x${comboMultiplier}`;
     }
 
@@ -630,7 +654,7 @@
     }
 
     function pedestrianDelay() {
-      const chaosCut = chaosMeter * 0.018 + (peakModeTimer > 0 ? 1.1 : 0);
+      const chaosCut = chaosMeter * 0.01 + (peakModeTimer > 0 ? 0.9 : 0);
       if (trafficLevel <= 2) return Math.max(4.8, 8.5 + Math.random() * 4.5 - chaosCut);
       if (trafficLevel <= 4) return Math.max(3.8, 6 + Math.random() * 3 - chaosCut);
       return Math.max(3.1, 4.2 + Math.random() * 2.6 - chaosCut);
@@ -655,7 +679,7 @@
     }
 
     function hazardDelay() {
-      const chaosCut = chaosMeter * 0.022 + (peakModeTimer > 0 ? 1.3 : 0);
+      const chaosCut = chaosMeter * 0.014 + (peakModeTimer > 0 ? 1.1 : 0);
       if (trafficLevel <= 2) return Math.max(4.4, 7.5 + Math.random() * 4.5 - chaosCut);
       if (trafficLevel <= 4) return Math.max(3.5, 5.5 + Math.random() * 3.6 - chaosCut);
       return Math.max(2.7, 4.1 + Math.random() * 2.8 - chaosCut);
@@ -947,7 +971,7 @@
 
     function update(dt) {
       const peakBoost = peakModeTimer > 0 ? 1.14 : 1;
-      const chaosBoost = 1 + chaosMeter * 0.0018;
+      const chaosBoost = 1 + chaosMeter * 0.0012;
       const baseSpeed = (235 + trafficLevel * 34) * peakBoost * chaosBoost;
       const speed = brakeTimer > 0 ? baseSpeed * 0.42 : baseSpeed;
       roadOffset = (roadOffset + speed * dt) % 58;
@@ -961,7 +985,7 @@
           messageTimer = 1.4;
         }
       } else {
-        addChaos(dt * (1.2 + trafficLevel * 0.18));
+        addChaos(dt * (0.42 + trafficLevel * 0.07));
       }
       hitTimer = Math.max(0, hitTimer - dt);
       brakeTimer = Math.max(0, brakeTimer - dt);
@@ -973,7 +997,7 @@
       spawnTimer -= dt;
       if (spawnTimer <= 0) {
         spawnVehicle();
-        const pressure = Math.max(0.26, 1.04 - trafficLevel * 0.075 - chaosMeter * 0.002 - (peakModeTimer > 0 ? 0.12 : 0));
+        const pressure = Math.max(0.3, 1.04 - trafficLevel * 0.075 - chaosMeter * 0.001 - (peakModeTimer > 0 ? 0.12 : 0));
         spawnTimer = pressure + Math.random() * 0.34;
       }
 
@@ -1232,7 +1256,7 @@
       if (!boxesIntersect(playerBox, nearBox)) return;
 
       item.nearMissAwarded = true;
-      addChaos(3.5);
+      addChaos(1.2);
       recordSafePass(25, "NEAR MISS", playerX, playerY - playerH * 0.68, "#facc15");
     }
 
@@ -1432,6 +1456,7 @@
       drawStopBoards();
       drawSplashes();
       drawPlayer();
+      drawLifeHearts();
       drawFloatingTexts();
       drawMessage();
       drawPeakBanner();
@@ -2354,6 +2379,29 @@
         ctx.fillText(item.text, item.x, item.y);
         ctx.restore();
       }
+    }
+
+    function drawLifeHearts() {
+      const startX = roadLeft + 14;
+      const y = height - 28;
+      const size = Math.max(20, laneWidth * 0.24);
+
+      ctx.save();
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.font = `900 ${size}px system-ui, sans-serif`;
+      ctx.lineWidth = 4;
+
+      for (let i = 0; i < START_LIVES; i++) {
+        const x = startX + i * size * 0.95;
+        const heart = i < lives ? "♥" : "♡";
+        ctx.strokeStyle = "#111827";
+        ctx.fillStyle = i < lives ? "#ef4444" : "rgba(255, 246, 214, 0.72)";
+        ctx.strokeText(heart, x, y);
+        ctx.fillText(heart, x, y);
+      }
+
+      ctx.restore();
     }
 
     function drawMessage() {
