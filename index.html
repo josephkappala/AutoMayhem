@@ -253,9 +253,9 @@
 
     <section id="startScreen" class="overlay">
       <div class="panel">
-        <div class="version-badge">Version 1</div>
+        <div class="version-badge">Version 2</div>
         <h1>Auto Mayhem:<br>Silk Board Run</h1>
-        <p class="tagline">Dodge buses, cabs, scooters, and road drama in a yellow-green auto.</p>
+        <p class="tagline">Dodge buses, cabs, scooters, pedestrians, and road drama in a yellow-green auto.</p>
         <div class="keys">
           <div class="key">Left Arrow: lane left</div>
           <div class="key">Right Arrow: lane right</div>
@@ -269,7 +269,7 @@
 
     <section id="gameOverScreen" class="overlay hidden">
       <div class="panel">
-        <div class="version-badge">Version 1</div>
+        <div class="version-badge">Version 2</div>
         <h1>Game Over</h1>
         <p class="tagline">Silk Board claimed another auto.</p>
         <p class="tagline">Final score: <strong id="finalScore">0</strong></p>
@@ -281,7 +281,7 @@
   <script>
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
-    const GAME_VERSION = "V1";
+    const GAME_VERSION = "V2";
 
     const scoreEl = document.getElementById("score");
     const livesEl = document.getElementById("lives");
@@ -297,6 +297,7 @@
     const PLAYER_LANE = 1;
     const PLAYER_Y_RATIO = 0.78;
     const LANE_SWITCH_TIME = 0.08;
+    const PEDESTRIAN_WARNING_TIME = 1.35;
 
     let width = 560;
     let height = 860;
@@ -313,15 +314,22 @@
     let playerH = 0;
 
     let vehicles = [];
+    let pedestrians = [];
+    let floatingTexts = [];
     let score = 0;
     let lives = START_LIVES;
     let trafficLevel = 1;
     let roadOffset = 0;
     let spawnTimer = 0;
+    let pedestrianTimer = 0;
     let hitTimer = 0;
+    let brakeTimer = 0;
+    let messageText = "";
+    let messageTimer = 0;
     let lastTime = 0;
     let gameState = "start";
     let nextVehicleId = 1;
+    let nextPedestrianId = 1;
     let animationId = 0;
 
     const trafficTypes = [
@@ -330,6 +338,18 @@
       { name: "SCOOTY", color: "#38bdf8", roof: "#0f172a", w: 0.46, h: 0.78 },
       { name: "VAN", color: "#a78bfa", roof: "#ede9fe", w: 0.68, h: 1.05 },
       { name: "TEMPO", color: "#22c55e", roof: "#dcfce7", w: 0.72, h: 1.12 }
+    ];
+
+    const shopTypes = [
+      { label: "TEA", color: "#ef4444", roof: "#facc15" },
+      { label: "DOSA", color: "#f97316", roof: "#22c55e" },
+      { label: "BAKERY", color: "#ec4899", roof: "#fde68a" },
+      { label: "MOBILE\nREPAIR", color: "#2563eb", roof: "#bae6fd" },
+      { label: "DARSHINI", color: "#16a34a", roof: "#facc15" },
+      { label: "JUICE", color: "#84cc16", roof: "#fb923c" },
+      { label: "METRO", color: "#64748b", roof: "#38bdf8" },
+      { label: "PETROL", color: "#0f766e", roof: "#f8fafc" },
+      { label: "OFFICE", color: "#7c3aed", roof: "#c4b5fd" }
     ];
 
     function resizeCanvas() {
@@ -360,18 +380,25 @@
 
     function resetGame() {
       vehicles = [];
+      pedestrians = [];
+      floatingTexts = [];
       score = 0;
       lives = START_LIVES;
       trafficLevel = 1;
       roadOffset = 0;
       spawnTimer = 0.65;
+      pedestrianTimer = pedestrianDelay();
       hitTimer = 0;
+      brakeTimer = 0;
+      messageText = "";
+      messageTimer = 0;
       playerLane = PLAYER_LANE;
       targetPlayerX = laneCenter(playerLane);
       playerX = targetPlayerX;
       laneStartX = targetPlayerX;
       laneSwitchTimer = 0;
       nextVehicleId = 1;
+      nextPedestrianId = 1;
       updateHud();
     }
 
@@ -438,12 +465,68 @@
       });
     }
 
+    function pedestrianDelay() {
+      if (trafficLevel <= 2) return 8.5 + Math.random() * 4.5;
+      if (trafficLevel <= 4) return 6 + Math.random() * 3;
+      return 4.2 + Math.random() * 2.6;
+    }
+
+    function canSpawnPedestrian() {
+      if (pedestrians.length > 0) return false;
+
+      const busyLanes = new Set();
+      for (const vehicle of vehicles) {
+        const nearCrossing = vehicle.y > -80 && vehicle.y < height * 0.58;
+        if (nearCrossing) busyLanes.add(vehicle.lane);
+      }
+
+      return busyLanes.size < 3;
+    }
+
+    function spawnPedestrian() {
+      if (!canSpawnPedestrian()) return false;
+
+      const side = Math.random() < 0.5 ? "left" : "right";
+      const direction = side === "left" ? 1 : -1;
+      const lanesToCross = trafficLevel >= 5
+        ? 1 + Math.floor(Math.random() * 3)
+        : 1 + Math.floor(Math.random() * 2);
+      const startX = side === "left" ? roadLeft - 24 : roadLeft + roadWidth + 24;
+      const endX = side === "left"
+        ? roadLeft + laneWidth * lanesToCross + laneWidth * 0.08
+        : roadLeft + roadWidth - laneWidth * lanesToCross - laneWidth * 0.08;
+
+      pedestrians.push({
+        id: nextPedestrianId++,
+        side,
+        direction,
+        state: "warning",
+        warningTimer: PEDESTRIAN_WARNING_TIME,
+        x: startX,
+        y: height * (0.42 + Math.random() * 0.12),
+        startX,
+        endX,
+        w: laneWidth * 0.2,
+        h: laneWidth * 0.42,
+        speedX: laneWidth * (0.34 + Math.min(trafficLevel, 7) * 0.018),
+        hit: false,
+        safeAwarded: false
+      });
+
+      messageText = "PEDESTRIAN CROSSING!";
+      messageTimer = 1.35;
+      return true;
+    }
+
     function update(dt) {
-      const speed = 235 + trafficLevel * 34;
+      const baseSpeed = 235 + trafficLevel * 34;
+      const speed = brakeTimer > 0 ? baseSpeed * 0.42 : baseSpeed;
       roadOffset = (roadOffset + speed * dt) % 58;
       score += dt * 8;
       trafficLevel = Math.min(9, 1 + Math.floor(score / 260));
       hitTimer = Math.max(0, hitTimer - dt);
+      brakeTimer = Math.max(0, brakeTimer - dt);
+      messageTimer = Math.max(0, messageTimer - dt);
 
       updatePlayerPosition(dt);
 
@@ -452,6 +535,12 @@
         spawnVehicle();
         const pressure = Math.max(0.34, 1.04 - trafficLevel * 0.075);
         spawnTimer = pressure + Math.random() * 0.34;
+      }
+
+      pedestrianTimer -= dt;
+      if (pedestrianTimer <= 0) {
+        const spawned = spawnPedestrian();
+        pedestrianTimer = spawned ? pedestrianDelay() : 1.2;
       }
 
       for (const vehicle of vehicles) {
@@ -463,9 +552,59 @@
         }
       }
 
+      updatePedestrians(dt, speed);
+      updateFloatingTexts(dt);
+
       vehicles = vehicles.filter(vehicle => vehicle.y < height + vehicle.h + 50);
+      pedestrians = pedestrians.filter(pedestrian => {
+        const exitedSide = pedestrian.direction > 0
+          ? pedestrian.x > pedestrian.endX + laneWidth * 0.4
+          : pedestrian.x < pedestrian.endX - laneWidth * 0.4;
+        return pedestrian.y < height + pedestrian.h + 50 && !exitedSide;
+      });
+      floatingTexts = floatingTexts.filter(text => text.life > 0);
       checkCollisions();
       updateHud();
+    }
+
+    function updatePedestrians(dt, roadSpeed) {
+      for (const pedestrian of pedestrians) {
+        pedestrian.y += roadSpeed * 0.28 * dt;
+
+        if (pedestrian.state === "warning") {
+          pedestrian.warningTimer -= dt;
+          if (pedestrian.warningTimer <= 0) {
+            pedestrian.state = "crossing";
+          }
+          continue;
+        }
+
+        pedestrian.x += pedestrian.direction * pedestrian.speedX * dt;
+
+        if (!pedestrian.safeAwarded && !pedestrian.hit && pedestrian.y > playerY + playerH * 0.62) {
+          pedestrian.safeAwarded = true;
+          score += 25;
+          addFloatingText("SAFE PASS +25", pedestrian.x, pedestrian.y - pedestrian.h, "#22c55e");
+        }
+      }
+    }
+
+    function updateFloatingTexts(dt) {
+      for (const text of floatingTexts) {
+        text.y -= 42 * dt;
+        text.life -= dt;
+      }
+    }
+
+    function addFloatingText(text, x, y, color) {
+      floatingTexts.push({
+        text,
+        x,
+        y,
+        color,
+        life: 1.05,
+        maxLife: 1.05
+      });
     }
 
     function updatePlayerPosition(dt) {
@@ -511,7 +650,41 @@
         if (hit) {
           lives -= 1;
           hitTimer = 1.05;
+          brakeTimer = 0.55;
           vehicles.splice(i, 1);
+          shakeRoad();
+          if (lives <= 0) endGame();
+          break;
+        }
+      }
+
+      if (gameState === "over") return;
+
+      for (let i = 0; i < pedestrians.length; i++) {
+        const pedestrian = pedestrians[i];
+        if (pedestrian.state !== "crossing" || pedestrian.hit) continue;
+
+        const box = {
+          left: pedestrian.x - pedestrian.w * 0.5,
+          right: pedestrian.x + pedestrian.w * 0.5,
+          top: pedestrian.y - pedestrian.h * 0.42,
+          bottom: pedestrian.y + pedestrian.h * 0.42
+        };
+
+        const nearMiss = playerBox.left < box.right &&
+          playerBox.right > box.left &&
+          playerBox.top < box.bottom &&
+          playerBox.bottom > box.top;
+
+        if (nearMiss) {
+          lives -= 1;
+          hitTimer = 1.2;
+          brakeTimer = 0.8;
+          pedestrian.hit = true;
+          pedestrians.splice(i, 1);
+          messageText = "Careful! Pedestrian crossing!";
+          messageTimer = 1.6;
+          addFloatingText("BRAKE!", targetPlayerX, playerY - playerH * 0.7, "#ef4444");
           shakeRoad();
           if (lives <= 0) endGame();
           break;
@@ -529,9 +702,12 @@
       ctx.clearRect(0, 0, width, height);
       drawCityEdges();
       drawRoad();
+      drawPedestrians();
       drawVehicles();
       drawPlayer();
       drawBanners();
+      drawFloatingTexts();
+      drawMessage();
 
       if (gameState === "paused") {
         drawPause();
@@ -547,107 +723,158 @@
       ctx.fillRect(roadLeft + roadWidth + 12, 0, width - roadLeft - roadWidth - 12, height);
 
       let edgeIndex = 0;
-      for (let y = -40; y < height + 80; y += 96) {
-        drawRoadsideGraphic(8, y + (roadOffset * 0.35), edgeIndex % 3, false);
-        drawRoadsideGraphic(width - roadLeft + 8, y + 48 + (roadOffset * 0.35), (edgeIndex + 1) % 3, true);
+      for (let y = -90 + roadOffset * 0.45; y < height + 120; y += 86) {
+        drawRoadsideShop(8, y, edgeIndex, false);
+        drawRoadsideShop(width - roadLeft + 8, y + 43, edgeIndex + 4, true);
         edgeIndex += 1;
       }
     }
 
-    function drawRoadsideGraphic(x, y, variant, flip) {
+    function drawRoadsideShop(x, y, index, flip) {
       const areaW = Math.max(38, roadLeft - 18);
       if (areaW < 32) return;
+      const shop = shopTypes[index % shopTypes.length];
+      const shopW = Math.min(areaW, 72);
+      const shopH = 48;
 
       ctx.save();
-      ctx.translate(x + areaW / 2, y + 26);
+      ctx.translate(x + areaW / 2, y + shopH / 2);
       if (flip) ctx.scale(-1, 1);
 
-      if (variant === 0) {
-        drawUmbrellaCart(areaW);
-      } else if (variant === 1) {
-        drawMiniBuilding(areaW);
-      } else {
-        drawParkedScooter(areaW);
+      ctx.fillStyle = "rgba(15, 23, 42, 0.22)";
+      ctx.fillRect(-shopW / 2 + 4, -shopH / 2 + 5, shopW, shopH);
+      ctx.fillStyle = "#fff7ed";
+      roundRect(-shopW / 2, -shopH / 2, shopW, shopH, 4);
+      ctx.fill();
+
+      ctx.fillStyle = shop.roof;
+      ctx.fillRect(-shopW / 2, -shopH / 2, shopW, 12);
+      ctx.fillStyle = shop.color;
+      ctx.fillRect(-shopW / 2 + 3, -shopH / 2 + 14, shopW - 6, 18);
+
+      ctx.save();
+      if (flip) ctx.scale(-1, 1);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `900 ${shop.label.length > 8 ? 8 : 10}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const lines = shop.label.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        ctx.fillText(lines[i], 0, -4 + i * 9);
+      }
+      ctx.restore();
+
+      ctx.fillStyle = "#172554";
+      ctx.fillRect(-shopW / 2 + 8, shopH / 2 - 13, 10, 13);
+      ctx.fillStyle = "#334155";
+      ctx.fillRect(shopW / 2 - 20, shopH / 2 - 12, 12, 8);
+
+      if (shop.label === "METRO") {
+        ctx.fillStyle = "#94a3b8";
+        ctx.fillRect(-5, -shopH / 2 - 28, 10, 28);
+        ctx.fillStyle = "#2563eb";
+        ctx.fillRect(-19, -shopH / 2 - 34, 38, 8);
+      } else if (shop.label === "PETROL") {
+        ctx.fillStyle = "#111827";
+        ctx.fillRect(shopW / 2 - 10, -shopH / 2 - 18, 5, 18);
+        ctx.fillStyle = "#facc15";
+        ctx.fillRect(shopW / 2 - 22, -shopH / 2 - 30, 28, 14);
       }
 
       ctx.restore();
     }
 
-    function drawUmbrellaCart(areaW) {
-      const poleH = 26;
-      ctx.fillStyle = "#7c2d12";
-      ctx.fillRect(-2, -14, 4, poleH);
-
-      ctx.fillStyle = "#ef4444";
-      ctx.beginPath();
-      ctx.arc(0, -15, Math.min(24, areaW * 0.34), Math.PI, 0);
-      ctx.lineTo(0, -15);
-      ctx.fill();
-
-      ctx.fillStyle = "#facc15";
-      ctx.beginPath();
-      ctx.moveTo(-5, -15);
-      ctx.lineTo(0, -39);
-      ctx.lineTo(5, -15);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.fillStyle = "#0f766e";
-      roundRect(-22, 8, 44, 16, 4);
-      ctx.fill();
-      ctx.fillStyle = "#111827";
-      ctx.beginPath();
-      ctx.arc(-14, 25, 5, 0, Math.PI * 2);
-      ctx.arc(14, 25, 5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    function drawMiniBuilding(areaW) {
-      const buildingW = Math.min(44, areaW * 0.72);
-      ctx.fillStyle = "#f8fafc";
-      roundRect(-buildingW / 2, -24, buildingW, 48, 4);
-      ctx.fill();
-
-      ctx.fillStyle = "#2563eb";
-      ctx.fillRect(-buildingW / 2, -24, buildingW, 10);
-      ctx.fillStyle = "#0f172a";
-      for (let row = 0; row < 2; row++) {
-        for (let col = 0; col < 3; col++) {
-          ctx.fillRect(-buildingW / 2 + 7 + col * 12, -8 + row * 14, 7, 7);
+    function drawPedestrians() {
+      for (const pedestrian of pedestrians) {
+        if (pedestrian.state === "warning") {
+          drawPedestrianWarning(pedestrian);
+        } else {
+          drawPedestrian(pedestrian);
         }
       }
-
-      ctx.fillStyle = "#22c55e";
-      ctx.beginPath();
-      ctx.arc(-buildingW / 2 - 8, 15, 10, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#854d0e";
-      ctx.fillRect(-buildingW / 2 - 10, 20, 4, 13);
     }
 
-    function drawParkedScooter(areaW) {
-      const scooterW = Math.min(48, areaW * 0.78);
+    function drawPedestrianWarning(pedestrian) {
+      const blink = Math.floor(performance.now() / 180) % 2 === 0;
+      const signX = pedestrian.side === "left" ? roadLeft + 18 : roadLeft + roadWidth - 18;
+      const signY = pedestrian.y;
+
+      ctx.save();
+      ctx.translate(signX, signY);
+      ctx.fillStyle = blink ? "#facc15" : "#ef4444";
       ctx.strokeStyle = "#111827";
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(-scooterW * 0.28, 7);
-      ctx.quadraticCurveTo(-6, -10, scooterW * 0.23, 4);
-      ctx.lineTo(scooterW * 0.35, -15);
+      ctx.moveTo(0, -20);
+      ctx.lineTo(-20, 16);
+      ctx.lineTo(20, 16);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = "#111827";
+      ctx.font = "900 23px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("!", 0, 2);
+      ctx.restore();
+
+      drawWarningRibbon("PEDESTRIAN CROSSING!", signY - 42);
+    }
+
+    function drawWarningRibbon(text, y) {
+      const ribbonW = Math.min(230, roadWidth * 0.84);
+      ctx.save();
+      ctx.translate(width / 2, y);
+      ctx.fillStyle = "#facc15";
+      ctx.strokeStyle = "#111827";
+      ctx.lineWidth = 2;
+      roundRect(-ribbonW / 2, -13, ribbonW, 26, 6);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#111827";
+      ctx.font = "900 12px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, 0, 0);
+      ctx.restore();
+    }
+
+    function drawPedestrian(pedestrian) {
+      ctx.save();
+      ctx.translate(pedestrian.x, pedestrian.y);
+      ctx.scale(pedestrian.direction, 1);
+
+      ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+      ctx.beginPath();
+      ctx.ellipse(0, pedestrian.h * 0.48, pedestrian.w * 0.9, pedestrian.h * 0.16, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#0f172a";
+      ctx.beginPath();
+      ctx.arc(0, -pedestrian.h * 0.35, pedestrian.w * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = "#0f172a";
+      ctx.lineWidth = 4;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(0, -pedestrian.h * 0.22);
+      ctx.lineTo(0, pedestrian.h * 0.1);
+      ctx.moveTo(0, -pedestrian.h * 0.05);
+      ctx.lineTo(pedestrian.w * 0.65, pedestrian.h * 0.05);
+      ctx.moveTo(0, -pedestrian.h * 0.04);
+      ctx.lineTo(-pedestrian.w * 0.58, pedestrian.h * 0.02);
+      ctx.moveTo(0, pedestrian.h * 0.1);
+      ctx.lineTo(pedestrian.w * 0.45, pedestrian.h * 0.42);
+      ctx.moveTo(0, pedestrian.h * 0.1);
+      ctx.lineTo(-pedestrian.w * 0.5, pedestrian.h * 0.42);
       ctx.stroke();
 
       ctx.fillStyle = "#f97316";
-      roundRect(-scooterW * 0.24, -5, scooterW * 0.48, 16, 6);
+      roundRect(-pedestrian.w * 0.55, -pedestrian.h * 0.2, pedestrian.w * 1.1, pedestrian.h * 0.28, 4);
       ctx.fill();
-      ctx.fillStyle = "#111827";
-      ctx.beginPath();
-      ctx.arc(-scooterW * 0.33, 15, 8, 0, Math.PI * 2);
-      ctx.arc(scooterW * 0.33, 15, 8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#e0f2fe";
-      ctx.beginPath();
-      ctx.arc(-scooterW * 0.33, 15, 3, 0, Math.PI * 2);
-      ctx.arc(scooterW * 0.33, 15, 3, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.restore();
     }
 
     function drawRoad() {
@@ -810,6 +1037,45 @@
       ctx.arc(0, -playerH * 0.05, playerW * 0.13, 0, Math.PI * 2);
       ctx.fill();
 
+      ctx.restore();
+    }
+
+    function drawFloatingTexts() {
+      for (const item of floatingTexts) {
+        const alpha = Math.max(0, item.life / item.maxLife);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = item.color;
+        ctx.strokeStyle = "#111827";
+        ctx.lineWidth = 4;
+        ctx.font = "900 17px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.strokeText(item.text, item.x, item.y);
+        ctx.fillText(item.text, item.x, item.y);
+        ctx.restore();
+      }
+    }
+
+    function drawMessage() {
+      if (messageTimer <= 0 || !messageText) return;
+
+      const alpha = Math.min(1, messageTimer);
+      const boxW = Math.min(330, roadWidth * 0.95);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(width / 2, height * 0.2);
+      ctx.fillStyle = "#facc15";
+      ctx.strokeStyle = "#111827";
+      ctx.lineWidth = 3;
+      roundRect(-boxW / 2, -18, boxW, 36, 8);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#111827";
+      ctx.font = "900 15px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(messageText, 0, 0);
       ctx.restore();
     }
 
