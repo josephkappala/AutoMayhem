@@ -63,10 +63,10 @@
       position: absolute;
       top: 12px;
       left: 50%;
-      width: min(78%, 460px);
+      width: min(72%, 430px);
       transform: translateX(-50%);
       display: grid;
-      grid-template-columns: repeat(6, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 6px;
       pointer-events: none;
       z-index: 2;
@@ -297,23 +297,6 @@
       backdrop-filter: blur(4px);
     }
 
-    .effects-chip {
-      position: absolute;
-      left: 10px;
-      top: 58px;
-      z-index: 4;
-      padding: 8px 10px;
-      border: 2px solid rgba(255, 246, 214, 0.45);
-      border-radius: 10px;
-      background: var(--panel-dark);
-      color: #fff6d6;
-      font-size: 11px;
-      font-weight: 900;
-      line-height: 1;
-      pointer-events: none;
-      box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
-    }
-
     .tap-zone {
       position: absolute;
       top: 0;
@@ -370,7 +353,7 @@
       .hud {
         top: 10px;
         left: 50%;
-        width: min(94vw, 470px);
+        width: min(88vw, 430px);
         gap: 4px;
       }
 
@@ -427,12 +410,6 @@
         padding: 10px 12px;
       }
 
-      .effects-chip {
-        top: 58px;
-        font-size: 10px;
-        padding: 7px 8px;
-      }
-
       .tap-zone {
         display: grid;
       }
@@ -445,12 +422,10 @@
     <div class="tap-zone left" aria-hidden="true">LEFT</div>
     <div class="tap-zone right" aria-hidden="true">RIGHT</div>
     <div class="mini-title" aria-hidden="true">AUTO MAYHEM</div>
-    <div id="effectsChip" class="effects-chip" aria-live="polite">FX Normal</div>
     <button id="soundToggle" class="sound-toggle" type="button" aria-label="Sound on" aria-pressed="false">🔊</button>
 
     <section class="hud" aria-live="polite">
       <div class="stat"><span>Score</span><strong id="score">0</strong></div>
-      <div class="stat"><span>Lives</span><strong id="livesHud">5</strong></div>
       <div class="stat"><span>Traffic</span><strong id="level">1</strong></div>
       <div id="chaosStat" class="stat chaos-stat"><span>Chaos Meter</span><strong id="chaos">0%</strong></div>
       <div class="stat"><span>Combo</span><strong id="combo">x1</strong></div>
@@ -502,7 +477,6 @@
     const GAME_VERSION = "V4";
 
     const scoreEl = document.getElementById("score");
-    const livesHudEl = document.getElementById("livesHud");
     const levelEl = document.getElementById("level");
     const chaosStatEl = document.getElementById("chaosStat");
     const chaosEl = document.getElementById("chaos");
@@ -519,7 +493,6 @@
     const startButton = document.getElementById("startButton");
     const tryAgainButton = document.getElementById("tryAgainButton");
     const soundToggle = document.getElementById("soundToggle");
-    const effectsChip = document.getElementById("effectsChip");
 
     // Core constants
     const LANE_COUNT = 4;
@@ -574,15 +547,12 @@
     let hazardTimer = 0;
     let cowWarningTimer = 0;
     let cowEventTimer = 0;
-    let specialMessageTimer = 0;
     let skidTimer = 0;
     let skidVelocity = 0;
     let skidOffset = 0;
     let hitTimer = 0;
     let brakeTimer = 0;
     let flashTimer = 0;
-    let messageText = "";
-    let messageTimer = 0;
     let lastTime = 0;
     let gameState = "start";
     let nextVehicleId = 1;
@@ -597,21 +567,11 @@
     let musicTimer = 0;
     let musicStep = 0;
     let ambientBarkTimer = 0;
-    let ambientShoutTimer = 0;
     let ambientHornTimer = 0;
     let reducedEffects = false;
 
     const scoreMilestones = [500, 1000, 2000];
     const shopLabels = ["TEA", "DOSA", "BAKERY", "MOBILE REPAIR", "DARSHINI", "JUICE", "PETROL", "OFFICE", "METRO"];
-
-    const specialMessages = [
-      "Wrong-side rider spotted!",
-      "BMTC boss fight incoming!",
-      "Rain in 3... 2... 1...",
-      "Auto meter is still running.",
-      "Silk Board energy rising.",
-      "One more quick lane change?"
-    ];
 
     const gameOverMessages = [
       "Silk Board claimed another auto.",
@@ -701,26 +661,22 @@
       milestoneIndex = 0;
       roadOffset = 0;
       spawnTimer = 0.65;
-      pedestrianTimer = pedestrianDelay();
+      pedestrianTimer = 1.0 + Math.random() * 1.0;
       animalTimer = animalDelay();
       stopBoardTimer = stopBoardDelay();
       hazardTimer = 2.6;
       cowWarningTimer = cowWarningDelay();
       cowEventTimer = 0;
-      specialMessageTimer = specialMessageDelay();
       skidTimer = 0;
       skidVelocity = 0;
       skidOffset = 0;
       musicTimer = 0;
       musicStep = 0;
       ambientBarkTimer = 3 + Math.random() * 5;
-      ambientShoutTimer = ambientShoutDelay();
       ambientHornTimer = ambientHornDelay();
       hitTimer = 0;
       brakeTimer = 0;
       flashTimer = 0;
-      messageText = "";
-      messageTimer = 0;
       playerLane = PLAYER_LANE;
       targetPlayerX = laneCenter(playerLane);
       playerX = targetPlayerX;
@@ -731,6 +687,8 @@
       nextAnimalId = 1;
       nextStopBoardId = 1;
       nextHazardId = 1;
+      spawnPedestrian();
+      pedestrianTimer = 2.0 + Math.random() * 1.2;
       updateHud();
     }
 
@@ -746,7 +704,6 @@
 
     function endGame() {
       gameState = "over";
-      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
       saveHighScore(score);
       finalScoreEl.textContent = Math.floor(score);
       finalHighScoreEl.textContent = highScore;
@@ -780,7 +737,6 @@
 
     function updateHud() {
       scoreEl.textContent = Math.floor(score);
-      livesHudEl.textContent = "♥".repeat(Math.max(0, lives)) || "0";
       levelEl.textContent = trafficLevel;
       chaosEl.textContent = `${Math.floor(chaosMeter)}%`;
       chaosStatEl.style.setProperty("--chaos-fill", `${Math.floor(chaosMeter)}%`);
@@ -788,7 +744,6 @@
       comboEl.textContent = `x${comboMultiplier}`;
       highScoreEl.textContent = highScore;
       titleHighScoreEl.textContent = highScore;
-      effectsChip.textContent = reducedEffects ? "FX Reduced" : "FX Normal";
     }
 
     function initAudio() {
@@ -820,14 +775,11 @@
       resumeAudio();
       muted = !muted;
       updateSoundButton();
-      if (muted && "speechSynthesis" in window) window.speechSynthesis.cancel();
       if (!muted) playSound("toggle");
     }
 
     function toggleEffects() {
       reducedEffects = !reducedEffects;
-      messageText = reducedEffects ? "Reduced effects" : "Normal effects";
-      messageTimer = 1.0;
       updateHud();
       playSound("toggle");
     }
@@ -911,8 +863,6 @@
           playTone(270, 0.07, "square", 0.06, 165);
           playNoise(0.05, 0.026);
         }, 105);
-      } else if (name === "shout") {
-        playAmbientShout();
       } else if (name === "horn") {
         playTone(392, 0.18, "square", 0.06, 392);
         playTone(523.25, 0.18, "sawtooth", 0.035, 523.25);
@@ -930,43 +880,14 @@
       return 6 + Math.random() * 9;
     }
 
-    function ambientShoutDelay() {
-      return 9 + Math.random() * 13;
-    }
-
     function ambientHornDelay() {
       return 4.8 + Math.random() * 7.5;
-    }
-
-    function playShoutTone() {
-      playTone(520, 0.07, "sawtooth", 0.032, 650);
-      setTimeout(() => playTone(390, 0.09, "square", 0.028, 315), 75);
-      setTimeout(() => playNoise(0.08, 0.018), 35);
-    }
-
-    function playAmbientShout() {
-      if (muted) return;
-      if ("speechSynthesis" in window && !window.speechSynthesis.speaking) {
-        const phrases = ["Ayyo!", "Side side!", "Careful!", "Oye!", "Meter running!"];
-        const utterance = new SpeechSynthesisUtterance(phrases[Math.floor(Math.random() * phrases.length)]);
-        const indianVoice = getIndianVoice();
-        if (indianVoice) utterance.voice = indianVoice;
-        utterance.lang = indianVoice ? indianVoice.lang : "en-IN";
-        utterance.rate = 1.12;
-        utterance.pitch = 1.25;
-        utterance.volume = 0.55;
-        utterance.onerror = playShoutTone;
-        window.speechSynthesis.speak(utterance);
-      } else {
-        playShoutTone();
-      }
     }
 
     function updateAmbientAudio(dt) {
       if (muted || gameState !== "playing") return;
 
       ambientBarkTimer -= dt;
-      ambientShoutTimer -= dt;
       ambientHornTimer -= dt;
 
       if (ambientBarkTimer <= 0) {
@@ -974,23 +895,10 @@
         ambientBarkTimer = ambientBarkDelay();
       }
 
-      if (ambientShoutTimer <= 0) {
-        playSound("shout");
-        ambientShoutTimer = ambientShoutDelay();
-      }
-
       if (ambientHornTimer <= 0) {
         playSound("horn");
         ambientHornTimer = ambientHornDelay();
       }
-    }
-
-    function getIndianVoice() {
-      if (!("speechSynthesis" in window)) return null;
-      const voices = window.speechSynthesis.getVoices();
-      return voices.find(voice => /en-IN|hi-IN/i.test(voice.lang)) ||
-        voices.find(voice => /india|indian|hindi/i.test(voice.name)) ||
-        null;
     }
 
     function updateMusic(dt) {
@@ -1036,9 +944,6 @@
       chaosMeter = Math.min(100, chaosMeter + amount);
       if (chaosMeter >= 100) {
         peakModeTimer = 15;
-        messageText = "PEAK BANGALORE MODE";
-        messageTimer = 2.2;
-        addFloatingText("PEAK BANGALORE MODE", width / 2, height * 0.34, "#facc15");
         playSound("peak");
         shakeRoad();
       }
@@ -1074,13 +979,22 @@
 
     function spawnVehicle() {
       const type = trafficTypes[Math.floor(Math.random() * trafficTypes.length)];
-      const lane = Math.floor(Math.random() * LANE_COUNT);
       const w = laneWidth * type.w;
       const h = laneWidth * type.h;
-      const minGap = laneWidth * 1.75;
-      const blocked = vehicles.some(vehicle => vehicle.lane === lane && vehicle.y < minGap);
+      const minGap = Math.max(laneWidth * 1.45, h * 1.12);
+      const openLanes = [];
 
-      if (blocked && Math.random() < 0.78) return;
+      for (let lane = 0; lane < LANE_COUNT; lane++) {
+        const blocked = vehicles.some(vehicle => {
+          const samePath = vehicle.lane === lane || vehicle.targetLane === lane;
+          return samePath && vehicle.y < minGap;
+        });
+        if (!blocked) openLanes.push(lane);
+      }
+
+      if (!openLanes.length) return false;
+
+      const lane = openLanes[Math.floor(Math.random() * openLanes.length)];
 
       vehicles.push({
         id: nextVehicleId++,
@@ -1097,6 +1011,8 @@
         weaveTimer: 0.6 + Math.random() * 1.4,
         wobble: Math.random() * Math.PI * 2
       });
+
+      return true;
     }
 
     // Obstacles, pedestrians, animals, shops, and hazards
@@ -1154,9 +1070,9 @@
 
     function pedestrianDelay() {
       const chaosCut = chaosMeter * 0.01 + (peakModeTimer > 0 ? 0.9 : 0);
-      if (trafficLevel <= 2) return Math.max(4.8, 8.5 + Math.random() * 4.5 - chaosCut);
-      if (trafficLevel <= 4) return Math.max(3.8, 6 + Math.random() * 3 - chaosCut);
-      return Math.max(3.1, 4.2 + Math.random() * 2.6 - chaosCut);
+      if (trafficLevel <= 2) return Math.max(1.8, 2.8 + Math.random() * 1.8 - chaosCut);
+      if (trafficLevel <= 4) return Math.max(1.6, 2.4 + Math.random() * 1.6 - chaosCut);
+      return Math.max(1.4, 2.0 + Math.random() * 1.4 - chaosCut);
     }
 
     function animalDelay() {
@@ -1184,20 +1100,10 @@
       return 15 + Math.random() * 6;
     }
 
-    function specialMessageDelay() {
-      return 9 + Math.random() * 7;
-    }
-
     function canSpawnPedestrian() {
-      if (pedestrians.length > 0) return false;
-
-      const busyLanes = new Set();
-      for (const vehicle of vehicles) {
-        const nearCrossing = vehicle.y > -80 && vehicle.y < height * 0.58;
-        if (nearCrossing) busyLanes.add(vehicle.lane);
-      }
-
-      return busyLanes.size < 3;
+      if (pedestrians.length >= 2) return false;
+      if (animals.some(animal => animal.kind === "cow")) return false;
+      return true;
     }
 
     function spawnPedestrian() {
@@ -1205,10 +1111,10 @@
 
       const side = Math.random() < 0.5 ? "left" : "right";
       const direction = side === "left" ? 1 : -1;
-      const isRunning = Math.random() < Math.min(0.34, 0.12 + trafficLevel * 0.025);
-      const lanesToCross = trafficLevel >= 5
-        ? 1 + Math.floor(Math.random() * 3)
-        : 1 + Math.floor(Math.random() * 2);
+      const isRunning = Math.random() < Math.min(0.48, 0.18 + trafficLevel * 0.035);
+      const lanesToCross = Math.random() < 0.5
+        ? LANE_COUNT
+        : 2 + Math.floor(Math.random() * Math.min(2, trafficLevel >= 4 ? 3 : 2));
       const startX = side === "left" ? roadLeft - 24 : roadLeft + roadWidth + 24;
       const endX = side === "left"
         ? roadLeft + laneWidth * lanesToCross + laneWidth * 0.08
@@ -1219,22 +1125,18 @@
         side,
         direction,
         x: startX,
-        y: height * (0.42 + Math.random() * 0.12),
+        y: height * (0.34 + Math.random() * 0.22),
         startX,
         endX,
-        w: laneWidth * 0.24,
-        h: laneWidth * 0.46,
+        w: laneWidth * 0.28,
+        h: laneWidth * 0.52,
         pace: isRunning ? "run" : "walk",
         handsUp: Math.random() < 0.38,
         stepPhase: Math.random() * Math.PI * 2,
-        speedX: laneWidth * ((isRunning ? 0.52 : 0.31) + Math.min(trafficLevel, 7) * 0.018),
+        speedX: laneWidth * ((isRunning ? 0.42 : 0.22) + Math.min(trafficLevel, 7) * 0.014),
         hit: false,
         safeAwarded: false
       });
-
-      messageText = "PEDESTRIAN CROSSING!";
-      messageTimer = 1.0;
-      playSound("warning");
 
       return true;
     }
@@ -1300,9 +1202,6 @@
     function startCowWarning() {
       if (!canSpawnCowCrossing()) return false;
       cowEventTimer = 1.55;
-      messageText = "COW CROSSING!";
-      messageTimer = 1.55;
-      playSound("warning");
       return true;
     }
 
@@ -1466,8 +1365,6 @@
         peakModeTimer = Math.max(0, peakModeTimer - dt);
         if (peakModeTimer === 0) {
           chaosMeter = 40;
-          messageText = "Chaos cooled to 40%";
-          messageTimer = 1.4;
         }
       } else {
         addChaos(dt * (0.42 + trafficLevel * 0.07));
@@ -1477,7 +1374,6 @@
       hitTimer = Math.max(0, hitTimer - dt);
       brakeTimer = Math.max(0, brakeTimer - dt);
       flashTimer = Math.max(0, flashTimer - dt);
-      messageTimer = Math.max(0, messageTimer - dt);
       skidTimer = Math.max(0, skidTimer - dt);
 
       updatePlayerPosition(dt);
@@ -1487,9 +1383,9 @@
 
       spawnTimer -= dt;
       if (spawnTimer <= 0) {
-        spawnVehicle();
-        const pressure = Math.max(0.3, 1.04 - trafficLevel * 0.075 - chaosIntensity * 0.1 - (peakModeTimer > 0 ? 0.12 : 0));
-        spawnTimer = pressure + Math.random() * 0.34;
+        const spawned = spawnVehicle();
+        const pressure = Math.max(0.3, 0.92 - trafficLevel * 0.06 - chaosIntensity * 0.08 - (peakModeTimer > 0 ? 0.1 : 0));
+        spawnTimer = spawned ? pressure + Math.random() * 0.26 : 0.16;
       }
 
       pedestrianTimer -= dt;
@@ -1525,13 +1421,6 @@
           const warned = startCowWarning();
           cowWarningTimer = warned ? cowWarningDelay() : 3.5;
         }
-      }
-
-      specialMessageTimer -= dt;
-      if (specialMessageTimer <= 0 && messageTimer <= 0) {
-        messageText = specialMessages[Math.floor(Math.random() * specialMessages.length)];
-        messageTimer = 1.35;
-        specialMessageTimer = specialMessageDelay();
       }
 
       for (const vehicle of vehicles) {
@@ -1852,8 +1741,6 @@
           flashTimer = 0.16;
           animal.hit = true;
           animals.splice(i, 1);
-          messageText = animal.kind === "cow" ? "Holy traffic jam!" : "Careful! Dog on road!";
-          messageTimer = 1.6;
           addFloatingText("BRAKE!", playerX, playerY - playerH * 0.7, "#ef4444");
           addDebris(playerX, playerY, animal.kind === "cow" ? "#fef3c7" : "#b45309");
           playSound("hit");
@@ -1888,8 +1775,6 @@
           flashTimer = 0.16;
           board.hit = true;
           stopBoards.splice(i, 1);
-          messageText = "Careful! STOP board!";
-          messageTimer = 1.6;
           addFloatingText("BRAKE!", playerX, playerY - playerH * 0.7, "#ef4444");
           addDebris(playerX, playerY, "#ef4444");
           playSound("hit");
@@ -1923,8 +1808,6 @@
           if (hazard.kind === "puddle") {
             skidTimer = 0.5;
             skidVelocity = (Math.random() < 0.5 ? -1 : 1) * laneWidth * 0.85;
-            messageText = "Skid!";
-            messageTimer = 1.1;
             addSplash(playerX, playerY + playerH * 0.25);
             playSound("splash");
             playSound("skid");
@@ -1934,8 +1817,6 @@
             hitTimer = 1.05;
             brakeTimer = hazard.kind === "barricade" ? 0.82 : 0.62;
             flashTimer = 0.16;
-            messageText = hazard.kind === "barricade" ? "Metro work ahead!" : "Pothole hit!";
-            messageTimer = 1.5;
             addFloatingText(hazard.kind === "barricade" ? "METRO WORK!" : "POTHOLE HIT!", playerX, playerY - playerH * 0.7, "#ef4444");
             addDebris(playerX, playerY, hazard.kind === "barricade" ? "#fb923c" : "#111827");
             playSound(hazard.kind === "barricade" ? "hit" : "pothole");
@@ -1971,8 +1852,6 @@
           flashTimer = 0.16;
           pedestrian.hit = true;
           pedestrians.splice(i, 1);
-          messageText = "PEDESTRIAN CROSSING!";
-          messageTimer = 1.6;
           addFloatingText("BRAKE!", playerX, playerY - playerH * 0.7, "#ef4444");
           addDebris(playerX, playerY, "#f97316");
           playSound("hit");
@@ -2000,9 +1879,9 @@
       drawSpeedLines();
       drawDustPuffs();
       drawRoadHazards();
-      drawPedestrians();
       drawAnimals();
       drawVehicles();
+      drawPedestrians();
       drawStopBoards();
       drawSplashes();
       drawDebris();
@@ -2010,8 +1889,6 @@
       drawLifeHearts();
       drawFloatingTexts();
       drawConfetti();
-      drawMessage();
-      drawPeakBanner();
       drawRedFlash();
 
       if (gameState === "paused") {
@@ -2121,7 +1998,7 @@
 
       ctx.save();
       ctx.translate(x, y);
-      ctx.rotate(Math.sin(vehicle.wobble) * 0.018);
+      ctx.rotate(stride * 0.018);
       ctx.scale(direction, 1);
 
       ctx.fillStyle = "rgba(0, 0, 0, 0.24)";
@@ -2891,9 +2768,9 @@
 
     function drawPlayer() {
       const flicker = hitTimer > 0 && Math.floor(hitTimer * 16) % 2 === 0;
-      if (flicker) return;
 
       ctx.save();
+      if (flicker) ctx.globalAlpha = 0.48;
       ctx.translate(playerX, playerY);
       const laneProgress = laneSwitchTimer > 0 ? laneSwitchTimer / LANE_SWITCH_TIME : 0;
       const wobble = Math.sin((1 - laneProgress) * Math.PI) * 0.06;
@@ -2990,49 +2867,6 @@
       ctx.restore();
     }
 
-    function drawMessage() {
-      if (messageTimer <= 0 || !messageText) return;
-
-      const alpha = Math.min(1, messageTimer);
-      const boxW = Math.min(330, roadWidth * 0.95);
-      ctx.save();
-      ctx.globalAlpha = alpha;
-      ctx.translate(width / 2, height * 0.2);
-      ctx.fillStyle = "#facc15";
-      ctx.strokeStyle = "#111827";
-      ctx.lineWidth = 3;
-      roundRect(-boxW / 2, -18, boxW, 36, 8);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = "#111827";
-      ctx.font = "900 15px system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(messageText, 0, 0);
-      ctx.restore();
-    }
-
-    function drawPeakBanner() {
-      if (peakModeTimer <= 0) return;
-
-      const pulse = 0.5 + Math.sin(performance.now() / 120) * 0.5;
-      ctx.save();
-      ctx.globalAlpha = 0.88 + pulse * 0.12;
-      ctx.translate(width / 2, height * 0.12);
-      ctx.fillStyle = "#ef4444";
-      ctx.strokeStyle = "#111827";
-      ctx.lineWidth = 4;
-      roundRect(-roadWidth * 0.44, -22, roadWidth * 0.88, 44, 8);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = "#fff6d6";
-      ctx.font = `900 ${Math.max(17, roadWidth * 0.052)}px system-ui, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("PEAK BANGALORE MODE", 0, 0);
-      ctx.restore();
-    }
-
     function drawRedFlash() {
       if (flashTimer <= 0) return;
       ctx.save();
@@ -3078,12 +2912,61 @@
       const dt = Math.min(0.033, (now - lastTime) / 1000 || 0);
       lastTime = now;
 
-      if (gameState === "playing") {
-        update(dt);
+      try {
+        if (gameState === "playing") {
+          update(dt);
+        }
+
+        draw();
+      } catch (error) {
+        recoverFromFrameError(error);
       }
 
-      draw();
       animationId = requestAnimationFrame(loop);
+    }
+
+    function recoverFromFrameError(error) {
+      console.warn("Recovered Auto Mayhem frame", error && error.message ? error.message : error);
+      sanitizeSceneObjects();
+      ensurePlayerState();
+      ctx.setTransform(window.devicePixelRatio || 1, 0, 0, window.devicePixelRatio || 1, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      try {
+        drawCityEdges();
+        drawRoad();
+        drawVehicles();
+        drawPlayer();
+        drawLifeHearts();
+      } catch (drawError) {
+        console.warn("Recovered Auto Mayhem fallback", drawError && drawError.message ? drawError.message : drawError);
+      }
+    }
+
+    function sanitizeSceneObjects() {
+      const hasPosition = item => Number.isFinite(item && item.x) && Number.isFinite(item && item.y);
+      vehicles = vehicles.filter(hasPosition);
+      pedestrians = pedestrians.filter(hasPosition);
+      animals = animals.filter(hasPosition);
+      stopBoards = stopBoards.filter(hasPosition);
+      roadHazards = roadHazards.filter(hasPosition);
+      floatingTexts = floatingTexts.filter(hasPosition);
+      dustPuffs = dustPuffs.filter(hasPosition);
+      splashBursts = splashBursts.filter(hasPosition);
+      debrisBursts = debrisBursts.filter(hasPosition);
+      confettiBursts = confettiBursts.filter(hasPosition);
+    }
+
+    function ensurePlayerState() {
+      if (!Number.isFinite(playerLane)) playerLane = PLAYER_LANE;
+      playerLane = Math.max(0, Math.min(LANE_COUNT - 1, Math.round(playerLane)));
+      if (!Number.isFinite(targetPlayerX)) targetPlayerX = laneCenter(playerLane);
+      if (!Number.isFinite(laneStartX)) laneStartX = targetPlayerX;
+      if (!Number.isFinite(playerX)) playerX = targetPlayerX;
+      if (!Number.isFinite(playerY)) playerY = height * PLAYER_Y_RATIO;
+      if (!Number.isFinite(playerW) || playerW <= 0) playerW = laneWidth * 0.58;
+      if (!Number.isFinite(playerH) || playerH <= 0) playerH = playerW * 1.46;
+      if (!Number.isFinite(skidOffset)) skidOffset = 0;
+      if (!Number.isFinite(skidVelocity)) skidVelocity = 0;
     }
 
     // Input handling
