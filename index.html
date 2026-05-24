@@ -746,7 +746,6 @@
       drawPedestrians();
       drawVehicles();
       drawPlayer();
-      drawBanners();
       drawFloatingTexts();
       drawMessage();
 
@@ -903,34 +902,25 @@
       ctx.lineTo(roadLeft + roadWidth, height);
       ctx.stroke();
 
-      for (let y = -40 + roadOffset; y < height + 70; y += 116) {
-        drawPothole(roadLeft + laneWidth * 0.52, y);
+      for (let y = -70 + roadOffset; y < height + 90; y += 112) {
+        drawPothole(roadLeft + laneWidth * 0.55, y, laneWidth * 0.16, laneWidth * 0.08, -0.2);
+        drawPothole(roadLeft + laneWidth * 2.35, y + 44, laneWidth * 0.12, laneWidth * 0.06, 0.25);
+        if (trafficLevel >= 3) {
+          drawPothole(roadLeft + laneWidth * 3.25, y + 84, laneWidth * 0.14, laneWidth * 0.07, -0.35);
+        }
       }
     }
 
-    function drawPothole(x, y) {
-      ctx.fillStyle = "rgba(15, 23, 42, 0.5)";
+    function drawPothole(x, y, radiusX, radiusY, rotation) {
+      ctx.fillStyle = "rgba(15, 23, 42, 0.54)";
       ctx.beginPath();
-      ctx.ellipse(x, y, 14, 8, -0.2, 0, Math.PI * 2);
+      ctx.ellipse(x, y, radiusX, radiusY, rotation, 0, Math.PI * 2);
       ctx.fill();
-    }
 
-    function drawBanners() {
-      ctx.save();
-      ctx.translate(width / 2, 118);
-      ctx.rotate(-0.05);
-      ctx.fillStyle = "rgba(255, 246, 214, 0.92)";
-      ctx.strokeStyle = "#111827";
-      ctx.lineWidth = 2;
-      roundRect(-115, -17, 230, 34, 7);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+      ctx.beginPath();
+      ctx.ellipse(x - radiusX * 0.25, y - radiusY * 0.25, radiusX * 0.45, radiusY * 0.24, rotation, 0, Math.PI * 2);
       ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = "#111827";
-      ctx.font = "900 13px system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("SILK BOARD FLYOVER AHEAD", 0, 0);
-      ctx.restore();
     }
 
     function drawVehicles() {
