@@ -315,6 +315,7 @@
     let vehicles = [];
     let pedestrians = [];
     let roadCrowds = [];
+    let animals = [];
     let floatingTexts = [];
     let score = 0;
     let lives = START_LIVES;
@@ -323,6 +324,7 @@
     let spawnTimer = 0;
     let pedestrianTimer = 0;
     let crowdTimer = 0;
+    let animalTimer = 0;
     let hitTimer = 0;
     let brakeTimer = 0;
     let messageText = "";
@@ -332,6 +334,7 @@
     let nextVehicleId = 1;
     let nextPedestrianId = 1;
     let nextCrowdId = 1;
+    let nextAnimalId = 1;
     let animationId = 0;
 
     const trafficTypes = [
@@ -386,6 +389,7 @@
       vehicles = [];
       pedestrians = [];
       roadCrowds = [];
+      animals = [];
       floatingTexts = [];
       score = 0;
       lives = START_LIVES;
@@ -394,6 +398,7 @@
       spawnTimer = 0.65;
       pedestrianTimer = pedestrianDelay();
       crowdTimer = crowdDelay();
+      animalTimer = animalDelay();
       hitTimer = 0;
       brakeTimer = 0;
       messageText = "";
@@ -406,6 +411,7 @@
       nextVehicleId = 1;
       nextPedestrianId = 1;
       nextCrowdId = 1;
+      nextAnimalId = 1;
       updateHud();
     }
 
@@ -539,6 +545,12 @@
       return 8 + Math.random() * 4;
     }
 
+    function animalDelay() {
+      if (trafficLevel <= 2) return 14 + Math.random() * 7;
+      if (trafficLevel <= 4) return 11 + Math.random() * 5;
+      return 8 + Math.random() * 4;
+    }
+
     function canSpawnPedestrian() {
       if (pedestrians.length > 0) return false;
 
@@ -608,6 +620,51 @@
       return true;
     }
 
+    function canSpawnAnimal() {
+      if (animals.length > 0) return false;
+      if (roadCrowds.length > 0) return false;
+
+      const activeHazards = pedestrians.length + roadCrowds.length;
+      if (activeHazards > 0 && trafficLevel < 4) return false;
+
+      const busyLanes = new Set();
+      for (const vehicle of vehicles) {
+        const nearEntry = vehicle.y > -80 && vehicle.y < height * 0.58;
+        if (nearEntry) busyLanes.add(vehicle.lane);
+      }
+
+      return busyLanes.size < 3;
+    }
+
+    function spawnAnimal() {
+      if (!canSpawnAnimal()) return false;
+
+      const kind = Math.random() < 0.55 ? "cow" : "dog";
+      const side = Math.random() < 0.5 ? "left" : "right";
+      const direction = side === "left" ? 1 : -1;
+      const laneSpan = kind === "cow" ? 1 + Math.floor(Math.random() * 2) : 1 + Math.floor(Math.random() * 3);
+      const startX = side === "left" ? roadLeft - laneWidth * 0.32 : roadLeft + roadWidth + laneWidth * 0.32;
+      const endX = side === "left"
+        ? Math.min(roadLeft + roadWidth - laneWidth * 0.3, roadLeft + laneWidth * laneSpan + laneWidth * 0.65)
+        : Math.max(roadLeft + laneWidth * 0.3, roadLeft + roadWidth - laneWidth * laneSpan - laneWidth * 0.65);
+
+      animals.push({
+        id: nextAnimalId++,
+        kind,
+        direction,
+        x: startX,
+        y: height * (0.3 + Math.random() * 0.18),
+        endX,
+        w: laneWidth * (kind === "cow" ? 0.48 : 0.3),
+        h: laneWidth * (kind === "cow" ? 0.34 : 0.22),
+        speedX: laneWidth * (kind === "cow" ? 0.16 : 0.38),
+        bob: Math.random() * Math.PI * 2,
+        hit: false
+      });
+
+      return true;
+    }
+
     function update(dt) {
       const baseSpeed = 235 + trafficLevel * 34;
       const speed = brakeTimer > 0 ? baseSpeed * 0.42 : baseSpeed;
@@ -639,6 +696,12 @@
         crowdTimer = spawned ? crowdDelay() : 1.4;
       }
 
+      animalTimer -= dt;
+      if (animalTimer <= 0) {
+        const spawned = spawnAnimal();
+        animalTimer = spawned ? animalDelay() : 1.5;
+      }
+
       for (const vehicle of vehicles) {
         vehicle.y += speed * vehicle.speedBoost * dt;
         updateVehicleMovement(vehicle, dt);
@@ -651,6 +714,7 @@
 
       updatePedestrians(dt, speed);
       updateRoadCrowds(dt, speed);
+      updateAnimals(dt, speed);
       updateFloatingTexts(dt);
 
       vehicles = vehicles.filter(vehicle => vehicle.y < height + vehicle.h + 50);
@@ -661,6 +725,12 @@
         return pedestrian.y < height + pedestrian.h + 50 && !exitedSide;
       });
       roadCrowds = roadCrowds.filter(crowd => crowd.y < height + crowd.h + 50);
+      animals = animals.filter(animal => {
+        const exitedSide = animal.direction > 0
+          ? animal.x > animal.endX + laneWidth * 0.4
+          : animal.x < animal.endX - laneWidth * 0.4;
+        return animal.y < height + animal.h + 50 && !exitedSide;
+      });
       floatingTexts = floatingTexts.filter(text => text.life > 0);
       checkCollisions();
       updateHud();
@@ -684,6 +754,14 @@
       for (const crowd of roadCrowds) {
         crowd.y += roadSpeed * 0.36 * dt;
         crowd.phase += dt * 7;
+      }
+    }
+
+    function updateAnimals(dt, roadSpeed) {
+      for (const animal of animals) {
+        animal.y += roadSpeed * (animal.kind === "cow" ? 0.22 : 0.3) * dt;
+        animal.x += animal.direction * animal.speedX * dt;
+        animal.bob += dt * (animal.kind === "cow" ? 4 : 9);
       }
     }
 
@@ -750,6 +828,39 @@
           hitTimer = 1.05;
           brakeTimer = 0.55;
           vehicles.splice(i, 1);
+          shakeRoad();
+          if (lives <= 0) endGame();
+          break;
+        }
+      }
+
+      if (gameState === "over") return;
+
+      for (let i = 0; i < animals.length; i++) {
+        const animal = animals[i];
+        if (animal.hit) continue;
+
+        const box = {
+          left: animal.x - animal.w * 0.48,
+          right: animal.x + animal.w * 0.48,
+          top: animal.y - animal.h * 0.42,
+          bottom: animal.y + animal.h * 0.42
+        };
+
+        const animalNearMiss = playerBox.left < box.right &&
+          playerBox.right > box.left &&
+          playerBox.top < box.bottom &&
+          playerBox.bottom > box.top;
+
+        if (animalNearMiss) {
+          lives -= 1;
+          hitTimer = 1.18;
+          brakeTimer = animal.kind === "cow" ? 0.95 : 0.72;
+          animal.hit = true;
+          animals.splice(i, 1);
+          messageText = animal.kind === "cow" ? "Careful! Cow on road!" : "Careful! Dog on road!";
+          messageTimer = 1.6;
+          addFloatingText("BRAKE!", targetPlayerX, playerY - playerH * 0.7, "#ef4444");
           shakeRoad();
           if (lives <= 0) endGame();
           break;
@@ -835,6 +946,7 @@
       drawRoad();
       drawPedestrians();
       drawRoadCrowds();
+      drawAnimals();
       drawVehicles();
       drawPlayer();
       drawFloatingTexts();
@@ -939,6 +1051,16 @@
       }
     }
 
+    function drawAnimals() {
+      for (const animal of animals) {
+        if (animal.kind === "cow") {
+          drawCow(animal);
+        } else {
+          drawDog(animal);
+        }
+      }
+    }
+
     function drawCrowd(crowd) {
       ctx.save();
       ctx.translate(crowd.x, crowd.y);
@@ -1017,6 +1139,118 @@
       ctx.moveTo(w * 0.22, h * 0.08);
       ctx.lineTo(w * (0.25 - legSwing), h * 0.44);
       ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawCow(animal) {
+      const w = animal.w;
+      const h = animal.h;
+      const legStep = Math.sin(animal.bob) * h * 0.08;
+
+      ctx.save();
+      ctx.translate(animal.x, animal.y);
+      ctx.scale(animal.direction, 1);
+
+      ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+      ctx.beginPath();
+      ctx.ellipse(0, h * 0.45, w * 0.55, h * 0.16, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#f8fafc";
+      roundRect(-w * 0.42, -h * 0.32, w * 0.72, h * 0.55, 10);
+      ctx.fill();
+
+      ctx.fillStyle = "#94a3b8";
+      ctx.beginPath();
+      ctx.ellipse(-w * 0.16, -h * 0.05, w * 0.13, h * 0.1, -0.4, 0, Math.PI * 2);
+      ctx.ellipse(w * 0.08, h * 0.06, w * 0.15, h * 0.1, 0.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#fef3c7";
+      ctx.beginPath();
+      ctx.arc(w * 0.42, -h * 0.12, w * 0.22, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = "#854d0e";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(w * 0.35, -h * 0.25);
+      ctx.lineTo(w * 0.18, -h * 0.42);
+      ctx.moveTo(w * 0.48, -h * 0.25);
+      ctx.lineTo(w * 0.64, -h * 0.42);
+      ctx.stroke();
+
+      ctx.fillStyle = "#111827";
+      ctx.beginPath();
+      ctx.arc(w * 0.48, -h * 0.15, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = "#111827";
+      ctx.lineWidth = 4;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.24, h * 0.12);
+      ctx.lineTo(-w * 0.28, h * 0.42 + legStep);
+      ctx.moveTo(-w * 0.02, h * 0.13);
+      ctx.lineTo(-w * 0.02, h * 0.42 - legStep);
+      ctx.moveTo(w * 0.2, h * 0.12);
+      ctx.lineTo(w * 0.23, h * 0.42 + legStep);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawDog(animal) {
+      const w = animal.w;
+      const h = animal.h;
+      const runStep = Math.sin(animal.bob) * h * 0.18;
+
+      ctx.save();
+      ctx.translate(animal.x, animal.y);
+      ctx.scale(animal.direction, 1);
+
+      ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+      ctx.beginPath();
+      ctx.ellipse(0, h * 0.46, w * 0.55, h * 0.15, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#a16207";
+      roundRect(-w * 0.42, -h * 0.2, w * 0.65, h * 0.35, 8);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(w * 0.36, -h * 0.2, w * 0.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#713f12";
+      ctx.beginPath();
+      ctx.moveTo(w * 0.32, -h * 0.33);
+      ctx.lineTo(w * 0.2, -h * 0.48);
+      ctx.lineTo(w * 0.44, -h * 0.38);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = "#713f12";
+      ctx.lineWidth = 3;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.42, -h * 0.12);
+      ctx.lineTo(-w * 0.68, -h * 0.32);
+      ctx.stroke();
+
+      ctx.strokeStyle = "#111827";
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.24, h * 0.06);
+      ctx.lineTo(-w * 0.3, h * 0.38 + runStep);
+      ctx.moveTo(0, h * 0.08);
+      ctx.lineTo(w * 0.02, h * 0.38 - runStep);
+      ctx.moveTo(w * 0.18, h * 0.04);
+      ctx.lineTo(w * 0.25, h * 0.36 + runStep);
+      ctx.stroke();
+
+      ctx.fillStyle = "#111827";
+      ctx.beginPath();
+      ctx.arc(w * 0.42, -h * 0.23, 1.8, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     }
 
