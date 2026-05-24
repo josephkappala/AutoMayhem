@@ -909,12 +909,11 @@
       ctx.lineTo(roadLeft + roadWidth, height);
       ctx.stroke();
 
-      for (let y = -70 + roadOffset; y < height + 90; y += 112) {
-        drawPothole(roadLeft + laneWidth * 0.55, y, laneWidth * 0.16, laneWidth * 0.08, -0.2);
-        drawPothole(roadLeft + laneWidth * 2.35, y + 44, laneWidth * 0.12, laneWidth * 0.06, 0.25);
-        drawPothole(roadLeft + laneWidth * 1.52, y + 82, laneWidth * 0.09, laneWidth * 0.045, 0.08);
-        if (trafficLevel >= 3) {
-          drawPothole(roadLeft + laneWidth * 3.25, y + 84, laneWidth * 0.14, laneWidth * 0.07, -0.35);
+      for (let y = -220 + roadOffset; y < height + 180; y += 360) {
+        drawPothole(roadLeft + laneWidth * 0.62, y, laneWidth * 0.15, laneWidth * 0.075, -0.2);
+        drawPothole(roadLeft + laneWidth * 2.45, y + 145, laneWidth * 0.12, laneWidth * 0.06, 0.25);
+        if (trafficLevel >= 5) {
+          drawPothole(roadLeft + laneWidth * 3.22, y + 275, laneWidth * 0.11, laneWidth * 0.055, -0.35);
         }
       }
     }
