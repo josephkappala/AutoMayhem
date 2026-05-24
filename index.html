@@ -59,8 +59,9 @@
     .hud {
       position: absolute;
       top: 12px;
-      left: 11%;
-      right: 24%;
+      left: 50%;
+      width: min(68%, 390px);
+      transform: translateX(-50%);
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 6px;
@@ -272,8 +273,8 @@
 
       .hud {
         top: 10px;
-        left: 11%;
-        right: 25%;
+        left: 50%;
+        width: min(72vw, 390px);
         gap: 4px;
       }
 
@@ -423,6 +424,8 @@
     let lives = START_LIVES;
     let trafficLevel = 1;
     let chaosMeter = 0;
+    let chaosIntensity = 0;
+    let currentRoadSpeed = 0;
     let peakModeTimer = 0;
     let comboCount = 0;
     let comboMultiplier = 1;
@@ -521,6 +524,8 @@
       lives = START_LIVES;
       trafficLevel = 1;
       chaosMeter = 0;
+      chaosIntensity = 0;
+      currentRoadSpeed = 0;
       peakModeTimer = 0;
       comboCount = 0;
       comboMultiplier = 1;
@@ -1096,10 +1101,16 @@
     }
 
     function update(dt) {
-      const peakBoost = peakModeTimer > 0 ? 1.14 : 1;
-      const chaosBoost = 1 + chaosMeter * 0.0012;
-      const baseSpeed = (235 + trafficLevel * 34) * peakBoost * chaosBoost;
-      const speed = brakeTimer > 0 ? baseSpeed * 0.42 : baseSpeed;
+      const targetChaosIntensity = peakModeTimer > 0 ? 1 : chaosMeter / 100;
+      chaosIntensity += (targetChaosIntensity - chaosIntensity) * Math.min(1, dt * 0.42);
+
+      const peakBoost = peakModeTimer > 0 ? 1.1 : 1;
+      const chaosBoost = 1 + chaosIntensity * 0.11;
+      const targetRoadSpeed = (235 + trafficLevel * 34) * peakBoost * chaosBoost;
+      if (!currentRoadSpeed) currentRoadSpeed = targetRoadSpeed;
+      currentRoadSpeed += (targetRoadSpeed - currentRoadSpeed) * Math.min(1, dt * 0.58);
+
+      const speed = brakeTimer > 0 ? currentRoadSpeed * 0.42 : currentRoadSpeed;
       roadOffset = (roadOffset + speed * dt) % 58;
       score += dt * 8;
       trafficLevel = Math.min(9, 1 + Math.floor(score / 260));
@@ -1123,7 +1134,7 @@
       spawnTimer -= dt;
       if (spawnTimer <= 0) {
         spawnVehicle();
-        const pressure = Math.max(0.3, 1.04 - trafficLevel * 0.075 - chaosMeter * 0.001 - (peakModeTimer > 0 ? 0.12 : 0));
+        const pressure = Math.max(0.3, 1.04 - trafficLevel * 0.075 - chaosIntensity * 0.1 - (peakModeTimer > 0 ? 0.12 : 0));
         spawnTimer = pressure + Math.random() * 0.34;
       }
 
