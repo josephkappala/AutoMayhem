@@ -569,6 +569,11 @@
     let ambientBarkTimer = 0;
     let ambientHornTimer = 0;
     let reducedEffects = false;
+    let steeringWheelAngle = 0;
+    let steeringWheelTarget = 0;
+    let dashboardAlertTimer = 0;
+    let cameraTilt = 0;
+    let cameraTiltTarget = 0;
 
     const scoreMilestones = [500, 1000, 2000];
     const shopLabels = ["TEA", "DOSA", "BAKERY", "MOBILE REPAIR", "DARSHINI", "JUICE", "PETROL", "OFFICE", "METRO"];
@@ -674,6 +679,11 @@
       musicStep = 0;
       ambientBarkTimer = 3 + Math.random() * 5;
       ambientHornTimer = ambientHornDelay();
+      steeringWheelAngle = 0;
+      steeringWheelTarget = 0;
+      dashboardAlertTimer = 0;
+      cameraTilt = 0;
+      cameraTiltTarget = 0;
       hitTimer = 0;
       brakeTimer = 0;
       flashTimer = 0;
@@ -732,6 +742,8 @@
       laneStartX = playerX;
       targetPlayerX = laneCenter(playerLane);
       laneSwitchTimer = LANE_SWITCH_TIME;
+      steeringWheelTarget = direction * 0.42;
+      cameraTiltTarget = reducedEffects ? 0 : direction * 0.012;
       playSound("lane");
     }
 
@@ -1375,6 +1387,11 @@
       brakeTimer = Math.max(0, brakeTimer - dt);
       flashTimer = Math.max(0, flashTimer - dt);
       skidTimer = Math.max(0, skidTimer - dt);
+      dashboardAlertTimer = Math.max(0, dashboardAlertTimer - dt);
+      steeringWheelTarget *= Math.pow(0.03, dt);
+      cameraTiltTarget *= Math.pow(0.02, dt);
+      steeringWheelAngle += (steeringWheelTarget - steeringWheelAngle) * Math.min(1, dt * 8);
+      cameraTilt += (cameraTiltTarget - cameraTilt) * Math.min(1, dt * 5);
 
       updatePlayerPosition(dt);
       if (Math.random() < dt * (reducedEffects ? 5 : 12)) {
@@ -1676,6 +1693,7 @@
       if (!boxesIntersect(playerBox, nearBox)) return;
 
       item.nearMissAwarded = true;
+      dashboardAlertTimer = reducedEffects ? 0.12 : 0.22;
       addChaos(1.2);
       recordSafePass(25, "NEAR MISS", playerX, playerY - playerH * 0.68, "#facc15");
     }
@@ -1874,6 +1892,16 @@
     // Rendering
     function draw() {
       ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = peakModeTimer > 0 ? "#7ddf8d" : "#66c98a";
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.save();
+      const tilt = reducedEffects ? 0 : cameraTilt + (skidTimer > 0 ? Math.sin(performance.now() / 45) * 0.006 : 0);
+      if (Math.abs(tilt) > 0.001) {
+        ctx.translate(width / 2, height / 2);
+        ctx.rotate(tilt);
+        ctx.translate(-width / 2, -height / 2);
+      }
       drawCityEdges();
       drawRoad();
       drawSpeedLines();
@@ -1886,10 +1914,12 @@
       drawSplashes();
       drawDebris();
       drawPlayer();
-      drawLifeHearts();
       drawFloatingTexts();
       drawConfetti();
+      ctx.restore();
+
       drawRedFlash();
+      drawDriverOverlay();
 
       if (gameState === "paused") {
         drawPause();
@@ -2867,6 +2897,149 @@
       ctx.restore();
     }
 
+    function drawDriverOverlay() {
+      const dashH = Math.max(92, Math.min(124, height * 0.14));
+      const dashY = height - dashH;
+      const shake = reducedEffects ? 0 : (hitTimer > 0 ? Math.sin(performance.now() / 18) * 4 : peakModeTimer > 0 ? Math.sin(performance.now() / 32) * 1.5 : 0);
+      const skidShake = reducedEffects ? 0 : (skidTimer > 0 ? Math.sin(performance.now() / 36) * 0.16 : 0);
+
+      ctx.save();
+      ctx.translate(shake, 0);
+
+      ctx.fillStyle = "rgba(17, 24, 39, 0.86)";
+      ctx.strokeStyle = "rgba(255, 246, 214, 0.76)";
+      ctx.lineWidth = 3;
+      roundRect(roadLeft + roadWidth * 0.08, dashY + dashH * 0.08, roadWidth * 0.84, dashH * 0.88, 18);
+      ctx.fill();
+      ctx.stroke();
+
+      const alertAlpha = Math.min(1, dashboardAlertTimer * 5);
+      if (alertAlpha > 0) {
+        ctx.fillStyle = `rgba(250, 204, 21, ${0.18 * alertAlpha})`;
+        roundRect(roadLeft + roadWidth * 0.08, dashY + dashH * 0.08, roadWidth * 0.84, dashH * 0.88, 18);
+        ctx.fill();
+      }
+
+      drawDashboardIndicator(roadLeft + roadWidth * 0.15, dashY + dashH * 0.28, "SPEED", `${Math.max(18, Math.floor(currentRoadSpeed / 5))}`);
+      drawDashboardIndicator(roadLeft + roadWidth * 0.32, dashY + dashH * 0.28, "LIVES", "♥".repeat(Math.max(0, lives)) || "0", "#ef4444");
+      drawDashboardIndicator(roadLeft + roadWidth * 0.68, dashY + dashH * 0.28, "CHAOS", `${Math.floor(chaosMeter)}%`, chaosMeter < 45 ? "#22c55e" : chaosMeter < 75 ? "#facc15" : "#ef4444");
+      drawDashboardIndicator(roadLeft + roadWidth * 0.84, dashY + dashH * 0.28, "TRAFFIC", `${trafficLevel}`);
+
+      drawSteeringWheel(width / 2, dashY + dashH * 0.68, Math.min(46, dashH * 0.36), steeringWheelAngle + skidShake);
+
+      ctx.restore();
+    }
+
+    function drawWindshieldFrame(dashY) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(15, 23, 42, 0.82)";
+      ctx.lineWidth = Math.max(7, laneWidth * 0.06);
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(roadLeft + roadWidth * 0.09, dashY + 10);
+      ctx.lineTo(roadLeft + roadWidth * 0.22, height * 0.1);
+      ctx.moveTo(roadLeft + roadWidth * 0.91, dashY + 10);
+      ctx.lineTo(roadLeft + roadWidth * 0.78, height * 0.1);
+      ctx.moveTo(roadLeft + roadWidth * 0.22, height * 0.1);
+      ctx.lineTo(roadLeft + roadWidth * 0.78, height * 0.1);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(255, 246, 214, 0.22)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(roadLeft + roadWidth * 0.12, dashY - 2);
+      ctx.quadraticCurveTo(width / 2, dashY - 18, roadLeft + roadWidth * 0.88, dashY - 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawRearViewMirror() {
+      const mirrorW = Math.min(122, roadWidth * 0.22);
+      const mirrorH = Math.max(26, mirrorW * 0.26);
+      const x = width / 2 - mirrorW / 2;
+      const y = Math.max(72, height * 0.08);
+
+      ctx.save();
+      ctx.fillStyle = "rgba(15, 23, 42, 0.86)";
+      ctx.strokeStyle = "rgba(255, 246, 214, 0.72)";
+      ctx.lineWidth = 3;
+      roundRect(x, y, mirrorW, mirrorH, 10);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.save();
+      roundRect(x + 6, y + 5, mirrorW - 12, mirrorH - 10, 7);
+      ctx.clip();
+      ctx.fillStyle = "#334155";
+      ctx.fillRect(x + 6, y + 5, mirrorW - 12, mirrorH - 10);
+      ctx.strokeStyle = "rgba(255, 246, 214, 0.48)";
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 5; i++) {
+        const lx = x + 16 + i * (mirrorW - 32) / 4;
+        const offset = (roadOffset * 0.45 + i * 15) % mirrorH;
+        ctx.beginPath();
+        ctx.moveTo(lx, y + mirrorH - offset);
+        ctx.lineTo(lx + (i - 2) * 3, y + mirrorH - offset - 18);
+        ctx.stroke();
+      }
+      ctx.fillStyle = "rgba(248, 250, 252, 0.15)";
+      ctx.fillRect(x + mirrorW * 0.12, y + 7, mirrorW * 0.38, mirrorH * 0.28);
+      ctx.restore();
+      ctx.restore();
+    }
+
+    function drawDashboardIndicator(x, y, label, value, valueColor = "#fff6d6") {
+      const w = Math.min(104, roadWidth * 0.17);
+      const h = 38;
+      ctx.save();
+      ctx.fillStyle = "rgba(15, 23, 42, 0.72)";
+      ctx.strokeStyle = "rgba(255, 246, 214, 0.36)";
+      ctx.lineWidth = 2;
+      roundRect(x - w / 2, y - h / 2, w, h, 8);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#94a3b8";
+      ctx.font = "900 8px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, x, y - 10);
+      ctx.fillStyle = valueColor;
+      ctx.font = `900 ${value.length > 4 ? 12 : 17}px system-ui, sans-serif`;
+      ctx.fillText(value, x, y + 8);
+      ctx.restore();
+    }
+
+    function drawSteeringWheel(x, y, radius, rotation) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rotation);
+      ctx.lineWidth = Math.max(5, radius * 0.16);
+      ctx.strokeStyle = "#050816";
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = "#1f2937";
+      ctx.lineWidth = Math.max(3, radius * 0.08);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -radius * 0.78);
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-radius * 0.72, radius * 0.35);
+      ctx.moveTo(0, 0);
+      ctx.lineTo(radius * 0.72, radius * 0.35);
+      ctx.stroke();
+
+      ctx.fillStyle = "#facc15";
+      ctx.strokeStyle = "#111827";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * 0.24, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
     function drawRedFlash() {
       if (flashTimer <= 0) return;
       ctx.save();
@@ -2936,7 +3109,6 @@
         drawRoad();
         drawVehicles();
         drawPlayer();
-        drawLifeHearts();
       } catch (drawError) {
         console.warn("Recovered Auto Mayhem fallback", drawError && drawError.message ? drawError.message : drawError);
       }
