@@ -328,6 +328,7 @@
     let pedestrians = [];
     let roadCrowds = [];
     let animals = [];
+    let stopBoards = [];
     let floatingTexts = [];
     let score = 0;
     let lives = START_LIVES;
@@ -337,6 +338,7 @@
     let pedestrianTimer = 0;
     let crowdTimer = 0;
     let animalTimer = 0;
+    let stopBoardTimer = 0;
     let hitTimer = 0;
     let brakeTimer = 0;
     let messageText = "";
@@ -347,6 +349,7 @@
     let nextPedestrianId = 1;
     let nextCrowdId = 1;
     let nextAnimalId = 1;
+    let nextStopBoardId = 1;
     let animationId = 0;
 
     const trafficTypes = [
@@ -402,6 +405,7 @@
       pedestrians = [];
       roadCrowds = [];
       animals = [];
+      stopBoards = [];
       floatingTexts = [];
       score = 0;
       lives = START_LIVES;
@@ -411,6 +415,7 @@
       pedestrianTimer = pedestrianDelay();
       crowdTimer = crowdDelay();
       animalTimer = animalDelay();
+      stopBoardTimer = stopBoardDelay();
       hitTimer = 0;
       brakeTimer = 0;
       messageText = "";
@@ -424,6 +429,7 @@
       nextPedestrianId = 1;
       nextCrowdId = 1;
       nextAnimalId = 1;
+      nextStopBoardId = 1;
       updateHud();
     }
 
@@ -552,15 +558,21 @@
     }
 
     function crowdDelay() {
-      if (trafficLevel <= 2) return 13 + Math.random() * 6;
-      if (trafficLevel <= 4) return 10 + Math.random() * 5;
-      return 8 + Math.random() * 4;
+      if (trafficLevel <= 2) return 11 + Math.random() * 6;
+      if (trafficLevel <= 4) return 8 + Math.random() * 5;
+      return 6.5 + Math.random() * 4;
     }
 
     function animalDelay() {
       if (trafficLevel <= 2) return 14 + Math.random() * 7;
       if (trafficLevel <= 4) return 11 + Math.random() * 5;
       return 8 + Math.random() * 4;
+    }
+
+    function stopBoardDelay() {
+      if (trafficLevel <= 2) return 8 + Math.random() * 4;
+      if (trafficLevel <= 4) return 6.8 + Math.random() * 3.8;
+      return 5.4 + Math.random() * 3.2;
     }
 
     function canSpawnPedestrian() {
@@ -611,21 +623,25 @@
     }
 
     function canSpawnCrowd() {
-      if (roadCrowds.length > 0) return false;
-      return vehicles.filter(vehicle => vehicle.y > -80 && vehicle.y < height * 0.5).length < 5;
+      return roadCrowds.length < 2;
     }
 
     function spawnCrowd() {
       if (!canSpawnCrowd()) return false;
 
-      const centerLane = 1 + Math.floor(Math.random() * 2);
+      const side = Math.random() < 0.5 ? "left" : "right";
+      const sideWidth = Math.max(36, roadLeft - 16);
+      const x = side === "left"
+        ? roadLeft - sideWidth * 0.5
+        : roadLeft + roadWidth + sideWidth * 0.5;
+
       roadCrowds.push({
         id: nextCrowdId++,
-        x: laneCenter(centerLane) + (Math.random() - 0.5) * laneWidth * 0.45,
+        side,
+        x,
         y: -laneWidth * 0.7,
-        w: laneWidth * 1.05,
-        h: laneWidth * 0.78,
-        hit: false,
+        w: Math.min(laneWidth * 1.05, sideWidth * 1.55),
+        h: laneWidth * 0.72,
         phase: Math.random() * Math.PI * 2
       });
 
@@ -634,9 +650,9 @@
 
     function canSpawnAnimal() {
       if (animals.length > 0) return false;
-      if (roadCrowds.length > 0) return false;
+      if (stopBoards.length > 0) return false;
 
-      const activeHazards = pedestrians.length + roadCrowds.length;
+      const activeHazards = pedestrians.length + stopBoards.length;
       if (activeHazards > 0 && trafficLevel < 4) return false;
 
       const busyLanes = new Set();
@@ -672,6 +688,56 @@
         speedX: laneWidth * (kind === "cow" ? 0.16 : 0.38),
         bob: Math.random() * Math.PI * 2,
         hit: false
+      });
+
+      return true;
+    }
+
+    function canSpawnStopBoard() {
+      if (stopBoards.length > 0) return false;
+      if (pedestrians.length > 0 || animals.length > 0) return false;
+
+      const topTraffic = vehicles.filter(vehicle => vehicle.y > -100 && vehicle.y < height * 0.52);
+      if (topTraffic.length >= 5) return false;
+
+      const openLanes = [];
+      for (let lane = 0; lane < LANE_COUNT; lane++) {
+        const blocked = topTraffic.some(vehicle => {
+          const sameLane = vehicle.lane === lane || vehicle.targetLane === lane;
+          return sameLane && vehicle.y < height * 0.42;
+        });
+        if (!blocked) openLanes.push(lane);
+      }
+
+      return openLanes.length > 0;
+    }
+
+    function spawnStopBoard() {
+      if (!canSpawnStopBoard()) return false;
+
+      const topTraffic = vehicles.filter(vehicle => vehicle.y > -100 && vehicle.y < height * 0.52);
+      const openLanes = [];
+      for (let lane = 0; lane < LANE_COUNT; lane++) {
+        const blocked = topTraffic.some(vehicle => {
+          const sameLane = vehicle.lane === lane || vehicle.targetLane === lane;
+          return sameLane && vehicle.y < height * 0.42;
+        });
+        if (!blocked) openLanes.push(lane);
+      }
+
+      const lane = openLanes[Math.floor(Math.random() * openLanes.length)];
+      const w = laneWidth * 0.58;
+      const h = laneWidth * 0.7;
+
+      stopBoards.push({
+        id: nextStopBoardId++,
+        lane,
+        x: laneCenter(lane),
+        y: -h - 20,
+        w,
+        h,
+        hit: false,
+        bob: Math.random() * Math.PI * 2
       });
 
       return true;
@@ -714,6 +780,12 @@
         animalTimer = spawned ? animalDelay() : 1.5;
       }
 
+      stopBoardTimer -= dt;
+      if (stopBoardTimer <= 0) {
+        const spawned = spawnStopBoard();
+        stopBoardTimer = spawned ? stopBoardDelay() : 1.4;
+      }
+
       for (const vehicle of vehicles) {
         vehicle.y += speed * vehicle.speedBoost * dt;
         updateVehicleMovement(vehicle, dt);
@@ -727,6 +799,7 @@
       updatePedestrians(dt, speed);
       updateRoadCrowds(dt, speed);
       updateAnimals(dt, speed);
+      updateStopBoards(dt, speed);
       updateFloatingTexts(dt);
 
       vehicles = vehicles.filter(vehicle => vehicle.y < height + vehicle.h + 50);
@@ -743,6 +816,7 @@
           : animal.x < animal.endX - laneWidth * 0.4;
         return animal.y < height + animal.h + 50 && !exitedSide;
       });
+      stopBoards = stopBoards.filter(board => board.y < height + board.h + 50);
       floatingTexts = floatingTexts.filter(text => text.life > 0);
       checkCollisions();
       updateHud();
@@ -764,8 +838,8 @@
 
     function updateRoadCrowds(dt, roadSpeed) {
       for (const crowd of roadCrowds) {
-        crowd.y += roadSpeed * 0.36 * dt;
-        crowd.phase += dt * 7;
+        crowd.y += roadSpeed * 0.42 * dt;
+        crowd.phase += dt * 2.2;
       }
     }
 
@@ -774,6 +848,13 @@
         animal.y += roadSpeed * (animal.kind === "cow" ? 0.22 : 0.3) * dt;
         animal.x += animal.direction * animal.speedX * dt;
         animal.bob += dt * (animal.kind === "cow" ? 4 : 9);
+      }
+    }
+
+    function updateStopBoards(dt, roadSpeed) {
+      for (const board of stopBoards) {
+        board.y += roadSpeed * 0.92 * dt;
+        board.bob += dt * 5;
       }
     }
 
@@ -881,29 +962,29 @@
 
       if (gameState === "over") return;
 
-      for (let i = 0; i < roadCrowds.length; i++) {
-        const crowd = roadCrowds[i];
-        if (crowd.hit) continue;
+      for (let i = 0; i < stopBoards.length; i++) {
+        const board = stopBoards[i];
+        if (board.hit) continue;
 
         const box = {
-          left: crowd.x - crowd.w * 0.42,
-          right: crowd.x + crowd.w * 0.42,
-          top: crowd.y - crowd.h * 0.36,
-          bottom: crowd.y + crowd.h * 0.36
+          left: board.x - board.w * 0.42,
+          right: board.x + board.w * 0.42,
+          top: board.y - board.h * 0.42,
+          bottom: board.y + board.h * 0.42
         };
 
-        const crowdNearMiss = playerBox.left < box.right &&
+        const stopBoardHit = playerBox.left < box.right &&
           playerBox.right > box.left &&
           playerBox.top < box.bottom &&
           playerBox.bottom > box.top;
 
-        if (crowdNearMiss) {
+        if (stopBoardHit) {
           lives -= 1;
-          hitTimer = 1.2;
-          brakeTimer = 0.85;
-          crowd.hit = true;
-          roadCrowds.splice(i, 1);
-          messageText = "Careful! Crowd on road!";
+          hitTimer = 1.05;
+          brakeTimer = 0.8;
+          board.hit = true;
+          stopBoards.splice(i, 1);
+          messageText = "Careful! STOP board!";
           messageTimer = 1.6;
           addFloatingText("BRAKE!", targetPlayerX, playerY - playerH * 0.7, "#ef4444");
           shakeRoad();
@@ -955,11 +1036,12 @@
     function draw() {
       ctx.clearRect(0, 0, width, height);
       drawCityEdges();
+      drawRoadCrowds();
       drawRoad();
       drawPedestrians();
-      drawRoadCrowds();
       drawAnimals();
       drawVehicles();
+      drawStopBoards();
       drawPlayer();
       drawFloatingTexts();
       drawMessage();
@@ -1063,6 +1145,12 @@
       }
     }
 
+    function drawStopBoards() {
+      for (const board of stopBoards) {
+        drawStopBoard(board);
+      }
+    }
+
     function drawAnimals() {
       for (const animal of animals) {
         if (animal.kind === "cow") {
@@ -1076,6 +1164,19 @@
     function drawCrowd(crowd) {
       ctx.save();
       ctx.translate(crowd.x, crowd.y);
+      if (crowd.side === "right") ctx.scale(-1, 1);
+
+      ctx.fillStyle = "rgba(255, 246, 214, 0.55)";
+      roundRect(-crowd.w * 0.56, -crowd.h * 0.52, crowd.w * 1.12, crowd.h * 1.05, 7);
+      ctx.fill();
+
+      ctx.fillStyle = "#ef4444";
+      ctx.fillRect(-crowd.w * 0.5, -crowd.h * 0.5, crowd.w, crowd.h * 0.12);
+      ctx.fillStyle = "#facc15";
+      ctx.beginPath();
+      ctx.arc(-crowd.w * 0.38, -crowd.h * 0.22, crowd.w * 0.12, 0, Math.PI * 2);
+      ctx.fill();
+
       ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
       ctx.beginPath();
       ctx.ellipse(0, crowd.h * 0.4, crowd.w * 0.48, crowd.h * 0.13, 0, 0, Math.PI * 2);
@@ -1083,19 +1184,19 @@
 
       drawPerson(-crowd.w * 0.26, 0, crowd.w * 0.18, crowd.h * 0.55, {
         direction: 1,
-        stride: Math.sin(crowd.phase),
+        stride: 0,
         shirt: "#2563eb",
         handsUp: true
       });
       drawPerson(0, -crowd.h * 0.05, crowd.w * 0.18, crowd.h * 0.55, {
         direction: -1,
-        stride: -Math.sin(crowd.phase),
+        stride: 0,
         shirt: "#f97316",
         handsUp: true
       });
       drawPerson(crowd.w * 0.25, crowd.h * 0.02, crowd.w * 0.18, crowd.h * 0.55, {
         direction: -1,
-        stride: Math.cos(crowd.phase),
+        stride: 0,
         shirt: "#22c55e",
         handsUp: false
       });
@@ -1110,7 +1211,10 @@
       ctx.font = `900 ${Math.max(8, crowd.w * 0.08)}px system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("ARG!", 0, -crowd.h * 0.45);
+      ctx.save();
+      if (crowd.side === "right") ctx.scale(-1, 1);
+      ctx.fillText("WHAT?", 0, -crowd.h * 0.45);
+      ctx.restore();
       ctx.restore();
     }
 
@@ -1298,11 +1402,10 @@
       ctx.lineTo(roadLeft + roadWidth, height);
       ctx.stroke();
 
-      for (let y = -220 + roadOffset; y < height + 180; y += 360) {
-        drawPothole(roadLeft + laneWidth * 0.62, y, laneWidth * 0.15, laneWidth * 0.075, -0.2);
-        drawPothole(roadLeft + laneWidth * 2.45, y + 145, laneWidth * 0.12, laneWidth * 0.06, 0.25);
-        if (trafficLevel >= 5) {
-          drawPothole(roadLeft + laneWidth * 3.22, y + 275, laneWidth * 0.11, laneWidth * 0.055, -0.35);
+      for (let y = -260 + roadOffset; y < height + 220; y += 560) {
+        drawPothole(roadLeft + laneWidth * 0.72, y, laneWidth * 0.13, laneWidth * 0.064, -0.2);
+        if (trafficLevel >= 6) {
+          drawPothole(roadLeft + laneWidth * 2.78, y + 280, laneWidth * 0.11, laneWidth * 0.054, 0.25);
         }
       }
     }
@@ -1317,6 +1420,51 @@
       ctx.beginPath();
       ctx.ellipse(x - radiusX * 0.25, y - radiusY * 0.25, radiusX * 0.45, radiusY * 0.24, rotation, 0, Math.PI * 2);
       ctx.fill();
+    }
+
+    function drawStopBoard(board) {
+      const wobble = Math.sin(board.bob) * board.w * 0.03;
+
+      ctx.save();
+      ctx.translate(board.x + wobble, board.y);
+
+      ctx.fillStyle = "rgba(0, 0, 0, 0.24)";
+      ctx.beginPath();
+      ctx.ellipse(0, board.h * 0.42, board.w * 0.48, board.h * 0.13, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#111827";
+      ctx.fillRect(-board.w * 0.06, -board.h * 0.03, board.w * 0.12, board.h * 0.62);
+
+      ctx.strokeStyle = "#facc15";
+      ctx.lineWidth = Math.max(4, board.w * 0.08);
+      ctx.beginPath();
+      ctx.moveTo(-board.w * 0.38, board.h * 0.24);
+      ctx.lineTo(board.w * 0.38, board.h * 0.24);
+      ctx.stroke();
+
+      ctx.fillStyle = "#ef4444";
+      ctx.strokeStyle = "#fff7ed";
+      ctx.lineWidth = Math.max(3, board.w * 0.06);
+      ctx.beginPath();
+      const r = board.w * 0.38;
+      for (let i = 0; i < 8; i++) {
+        const angle = -Math.PI / 8 + i * Math.PI / 4;
+        const x = Math.cos(angle) * r;
+        const y = -board.h * 0.23 + Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `900 ${Math.max(10, board.w * 0.24)}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("STOP", 0, -board.h * 0.23);
+      ctx.restore();
     }
 
     function drawVehicles() {
@@ -1524,41 +1672,49 @@
       ctx.ellipse(0, h * 0.43, w * 0.56, h * 0.13, 0, 0, Math.PI * 2);
       ctx.fill();
 
+      ctx.fillStyle = "#dc2626";
+      roundRect(-w * 0.1, -h * 0.52, w * 0.2, h * 0.08, 3);
+      ctx.fill();
+
       ctx.fillStyle = "#111827";
-      roundRect(-w * 0.12, -h * 0.5, w * 0.24, h * 0.2, 5);
+      roundRect(-w * 0.12, -h * 0.48, w * 0.24, h * 0.18, 5);
       ctx.fill();
-      roundRect(-w * 0.17, h * 0.33, w * 0.34, h * 0.2, 5);
-      ctx.fill();
-
-      ctx.fillStyle = isScooter ? "#f8fafc" : "#111827";
-      roundRect(-w * 0.24, -h * 0.3, w * 0.48, h * 0.5, 10);
-      ctx.fill();
-      ctx.fillStyle = vehicle.type.color;
-      roundRect(-w * 0.34, -h * 0.08, w * 0.68, h * 0.36, isScooter ? 12 : 7);
+      roundRect(-w * 0.18, h * 0.35, w * 0.36, h * 0.2, 5);
       ctx.fill();
 
-      ctx.fillStyle = isScooter ? "#e0f2fe" : "#facc15";
-      roundRect(-w * 0.26, h * 0.2, w * 0.52, h * 0.13, 4);
+      ctx.fillStyle = isScooter ? "#f8fafc" : vehicle.type.color;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.22, -h * 0.34);
+      ctx.lineTo(w * 0.22, -h * 0.34);
+      ctx.lineTo(w * 0.34, h * 0.32);
+      ctx.lineTo(-w * 0.34, h * 0.32);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = isScooter ? vehicle.type.color : "#111827";
+      roundRect(-w * 0.26, -h * 0.18, w * 0.52, h * 0.3, isScooter ? 10 : 6);
       ctx.fill();
 
       ctx.strokeStyle = "#111827";
       ctx.lineWidth = Math.max(3, w * 0.08);
       ctx.lineCap = "round";
       ctx.beginPath();
-      ctx.moveTo(-w * 0.5, h * 0.29);
-      ctx.lineTo(w * 0.5, h * 0.29);
-      ctx.moveTo(-w * 0.26, -h * 0.28);
-      ctx.lineTo(w * 0.26, -h * 0.28);
+      ctx.moveTo(-w * 0.5, h * 0.32);
+      ctx.lineTo(w * 0.5, h * 0.32);
+      ctx.moveTo(-w * 0.32, -h * 0.28);
+      ctx.lineTo(w * 0.32, -h * 0.28);
       ctx.stroke();
 
-      ctx.fillStyle = "#fef3c7";
+      ctx.fillStyle = "#0f172a";
       ctx.beginPath();
-      ctx.arc(0, h * 0.08, w * 0.24, 0, Math.PI * 2);
+      ctx.arc(0, -h * 0.03, w * 0.23, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = "#111827";
-      ctx.beginPath();
-      ctx.arc(0, h * 0.06, w * 0.15, 0, Math.PI * 2);
+      ctx.fillStyle = "#fef3c7";
+      ctx.fillRect(-w * 0.16, h * 0.02, w * 0.32, h * 0.08);
+
+      ctx.fillStyle = "#e0f2fe";
+      roundRect(-w * 0.24, h * 0.18, w * 0.48, h * 0.12, 4);
       ctx.fill();
 
       ctx.fillStyle = "#111827";
@@ -1567,14 +1723,11 @@
       ctx.arc(0, h * 0.46, w * 0.2, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = "#f8fafc";
-      ctx.fillRect(-w * 0.26, h * 0.36, w * 0.2, h * 0.08);
-      ctx.fillRect(w * 0.06, h * 0.36, w * 0.2, h * 0.08);
       ctx.fillStyle = "#facc15";
       ctx.beginPath();
-      ctx.moveTo(0, h * 0.63);
-      ctx.lineTo(-w * 0.2, h * 0.36);
-      ctx.lineTo(w * 0.2, h * 0.36);
+      ctx.moveTo(0, h * 0.62);
+      ctx.lineTo(-w * 0.24, h * 0.32);
+      ctx.lineTo(w * 0.24, h * 0.32);
       ctx.closePath();
       ctx.fill();
       ctx.restore();
