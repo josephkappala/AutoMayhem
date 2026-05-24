@@ -750,16 +750,27 @@
       const arpNotes = [329.63, 392, 493.88, 392, 329.63, 293.66, 246.94, 293.66, 329.63, 392, 523.25, 392, 329.63, 293.66, 220, 246.94];
       const step = musicStep % arpNotes.length;
       const beat = musicStep % 8;
-      const tempo = peakModeTimer > 0 ? 0.112 : 0.135;
+      const tempo = peakModeTimer > 0 ? 0.082 : 0.098;
 
       if (beat === 0 || beat === 4) {
         const bass = bassNotes[beat];
-        playTone(bass, 0.13, "sawtooth", 0.018, bass * 0.985);
+        playTone(bass, 0.22, "sawtooth", 0.045, bass * 0.985);
+      } else if (beat === 2 || beat === 6) {
+        const bass = bassNotes[beat] * 0.5;
+        playTone(bass, 0.16, "triangle", 0.026, bass * 1.02);
       }
 
-      playTone(arpNotes[step], 0.075, "square", 0.012, arpNotes[step] * 1.006);
+      if (step % 8 === 0) {
+        playTone(164.81, 0.62, "triangle", 0.018, 164.81);
+        playTone(246.94, 0.62, "sine", 0.012, 246.94);
+      }
+
+      playTone(arpNotes[step], 0.09, "square", 0.026, arpNotes[step] * 1.006);
       if (step % 4 === 2) {
-        playTone(arpNotes[step] * 1.5, 0.055, "triangle", 0.007, arpNotes[step] * 1.54);
+        playTone(arpNotes[step] * 1.5, 0.075, "triangle", 0.015, arpNotes[step] * 1.54);
+      }
+      if (step % 2 === 1) {
+        playTone(arpNotes[step] * 2, 0.035, "square", 0.006, arpNotes[step] * 2.01);
       }
 
       musicStep += 1;
