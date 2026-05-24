@@ -336,6 +336,7 @@
       { name: "CAB", color: "#facc15", roof: "#111827", w: 0.64, h: 0.98, weave: 0.11 },
       { name: "SCOOTY", color: "#38bdf8", roof: "#0f172a", w: 0.42, h: 0.8, weave: 0.36, kind: "bike" },
       { name: "BIKE", color: "#f97316", roof: "#111827", w: 0.36, h: 0.72, weave: 0.44, kind: "bike" },
+      { name: "AUTO", color: "#ffcf24", roof: "#2fb85e", w: 0.58, h: 0.9, weave: 0.22 },
       { name: "VAN", color: "#a78bfa", roof: "#ede9fe", w: 0.68, h: 1.05, weave: 0.08 },
       { name: "TEMPO", color: "#22c55e", roof: "#dcfce7", w: 0.72, h: 1.12, weave: 0.07 }
     ];
@@ -463,6 +464,7 @@
         type,
         passed: false,
         speedBoost: (type.kind === "bike" ? 1.06 : 0.88) + Math.random() * 0.36,
+        quickShiftTimer: 0,
         weaveTimer: 0.6 + Math.random() * 1.4,
         wobble: Math.random() * Math.PI * 2
       });
@@ -497,6 +499,7 @@
 
         if (Math.random() < chance && canVehicleShift(vehicle, nextLane)) {
           vehicle.targetLane = nextLane;
+          vehicle.quickShiftTimer = Math.random() < 0.42 ? 0.36 : 0;
         }
 
         vehicle.weaveTimer = (isBike ? 0.55 : 1.1) + Math.random() * (isBike ? 1.05 : 1.8);
@@ -506,7 +509,11 @@
         ? Math.sin(performance.now() / 180 + vehicle.wobble) * laneWidth * 0.045
         : 0;
       const desiredX = laneCenter(vehicle.targetLane) + laneDrift;
-      const smoothness = isBike ? 6.2 : 3.4;
+      vehicle.quickShiftTimer = Math.max(0, vehicle.quickShiftTimer - dt);
+      const isAuto = vehicle.type.name === "AUTO";
+      const smoothness = vehicle.quickShiftTimer > 0
+        ? (isBike ? 10.5 : 8.4)
+        : (isBike ? 6.2 : isAuto ? 5.2 : 3.4);
       vehicle.x += (desiredX - vehicle.x) * Math.min(1, dt * smoothness);
 
       if (Math.abs(vehicle.x - laneCenter(vehicle.targetLane)) < laneWidth * 0.06) {
@@ -905,6 +912,7 @@
       for (let y = -70 + roadOffset; y < height + 90; y += 112) {
         drawPothole(roadLeft + laneWidth * 0.55, y, laneWidth * 0.16, laneWidth * 0.08, -0.2);
         drawPothole(roadLeft + laneWidth * 2.35, y + 44, laneWidth * 0.12, laneWidth * 0.06, 0.25);
+        drawPothole(roadLeft + laneWidth * 1.52, y + 82, laneWidth * 0.09, laneWidth * 0.045, 0.08);
         if (trafficLevel >= 3) {
           drawPothole(roadLeft + laneWidth * 3.25, y + 84, laneWidth * 0.14, laneWidth * 0.07, -0.35);
         }
@@ -952,6 +960,8 @@
         drawBusShape(w, h, type);
       } else if (type.name === "CAB") {
         drawCabShape(w, h, type);
+      } else if (type.name === "AUTO") {
+        drawTrafficAutoShape(w, h, type);
       } else if (type.name === "VAN") {
         drawVanShape(w, h, type);
       } else if (type.name === "TEMPO") {
@@ -1006,6 +1016,33 @@
       ctx.textBaseline = "middle";
       ctx.fillText("TAXI", 0, h * 0.34);
       drawSideWheels(w, h, 0.31, 0.15);
+    }
+
+    function drawTrafficAutoShape(w, h, type) {
+      ctx.fillStyle = type.roof;
+      roundRect(-w * 0.48, -h * 0.46, w * 0.96, h * 0.48, 10);
+      ctx.fill();
+
+      ctx.fillStyle = type.color;
+      roundRect(-w * 0.5, -h * 0.15, w, h * 0.62, 12);
+      ctx.fill();
+
+      ctx.fillStyle = "#172554";
+      roundRect(-w * 0.31, -h * 0.35, w * 0.62, h * 0.18, 5);
+      ctx.fill();
+
+      ctx.fillStyle = "#111827";
+      ctx.fillRect(-w * 0.58, -h * 0.06, w * 0.1, h * 0.28);
+      ctx.fillRect(w * 0.48, -h * 0.06, w * 0.1, h * 0.28);
+      ctx.fillRect(-w * 0.4, h * 0.33, w * 0.8, h * 0.07);
+
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillRect(-w * 0.24, h * 0.22, w * 0.48, h * 0.1);
+      ctx.fillStyle = "#111827";
+      ctx.font = `900 ${Math.max(8, w * 0.15)}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("AUTO", 0, h * 0.27);
     }
 
     function drawVanShape(w, h, type) {
@@ -1090,7 +1127,7 @@
       ctx.fillStyle = "#111827";
       roundRect(-w * 0.16, -h * 0.52, w * 0.32, h * 0.22, 5);
       ctx.fill();
-      roundRect(-w * 0.18, h * 0.24, w * 0.36, h * 0.28, 5);
+      roundRect(-w * 0.16, h * 0.28, w * 0.32, h * 0.24, 5);
       ctx.fill();
 
       ctx.fillStyle = isScooter ? "#f8fafc" : "#111827";
@@ -1108,8 +1145,8 @@
       ctx.lineWidth = Math.max(3, w * 0.08);
       ctx.lineCap = "round";
       ctx.beginPath();
-      ctx.moveTo(-w * 0.43, h * 0.1);
-      ctx.lineTo(w * 0.43, h * 0.1);
+      ctx.moveTo(-w * 0.46, h * 0.22);
+      ctx.lineTo(w * 0.46, h * 0.22);
       ctx.moveTo(-w * 0.32, -h * 0.26);
       ctx.lineTo(w * 0.32, -h * 0.26);
       ctx.stroke();
@@ -1121,13 +1158,20 @@
 
       ctx.fillStyle = "#111827";
       ctx.beginPath();
-      ctx.arc(0, h * 0.43, w * 0.17, 0, Math.PI * 2);
       ctx.arc(0, -h * 0.46, w * 0.14, 0, Math.PI * 2);
+      ctx.arc(0, h * 0.46, w * 0.2, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = "#f8fafc";
-      ctx.fillRect(-w * 0.22, h * 0.3, w * 0.16, h * 0.07);
-      ctx.fillRect(w * 0.06, h * 0.3, w * 0.16, h * 0.07);
+      ctx.fillRect(-w * 0.24, h * 0.32, w * 0.18, h * 0.08);
+      ctx.fillRect(w * 0.06, h * 0.32, w * 0.18, h * 0.08);
+      ctx.fillStyle = "#facc15";
+      ctx.beginPath();
+      ctx.moveTo(0, h * 0.58);
+      ctx.lineTo(-w * 0.16, h * 0.36);
+      ctx.lineTo(w * 0.16, h * 0.36);
+      ctx.closePath();
+      ctx.fill();
       ctx.restore();
     }
 
