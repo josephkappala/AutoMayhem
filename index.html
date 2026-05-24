@@ -62,7 +62,7 @@
       left: 11%;
       right: 11%;
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 6px;
       pointer-events: none;
       z-index: 2;
@@ -70,7 +70,7 @@
 
     .stat {
       min-width: 0;
-      padding: 7px 6px;
+      padding: 6px 4px;
       border: 2px solid rgba(17, 24, 39, 0.9);
       border-radius: 8px;
       background: #fff6d6;
@@ -81,7 +81,7 @@
     .stat span {
       display: block;
       color: #475569;
-      font-size: 10px;
+      font-size: 8px;
       font-weight: 800;
       line-height: 1;
       text-transform: uppercase;
@@ -91,7 +91,7 @@
       display: block;
       margin-top: 3px;
       color: #111827;
-      font-size: clamp(15px, 3.4vw, 19px);
+      font-size: clamp(12px, 2.9vw, 17px);
       line-height: 1.05;
     }
 
@@ -218,11 +218,11 @@
       }
 
       .stat span {
-        font-size: 9px;
+        font-size: 7px;
       }
 
       .stat strong {
-        font-size: clamp(14px, 4.1vw, 17px);
+        font-size: clamp(11px, 3.4vw, 15px);
       }
 
       .panel {
@@ -261,13 +261,15 @@
       <div class="stat"><span>Score</span><strong id="score">0</strong></div>
       <div class="stat"><span>Lives</span><strong id="lives">3</strong></div>
       <div class="stat"><span>Traffic</span><strong id="level">1</strong></div>
+      <div class="stat"><span>Chaos Meter</span><strong id="chaos">0%</strong></div>
+      <div class="stat"><span>Combo</span><strong id="combo">x1</strong></div>
     </section>
 
     <section id="startScreen" class="overlay">
       <div class="panel">
-        <div class="version-badge">Version 2</div>
+        <div class="version-badge">Version 3</div>
         <h1>Auto Mayhem:<br>Silk Board Run</h1>
-        <p class="tagline">Dodge buses, cabs, scooters, pedestrians, and road drama in a yellow-green auto.</p>
+        <p class="tagline">Dodge buses, scooters, pedestrians, potholes, puddles, and Bangalore road drama.</p>
         <div class="keys">
           <div class="key">Left Arrow: lane left</div>
           <div class="key">Right Arrow: lane right</div>
@@ -281,9 +283,9 @@
 
     <section id="gameOverScreen" class="overlay hidden">
       <div class="panel">
-        <div class="version-badge">Version 2</div>
+        <div class="version-badge">Version 3</div>
         <h1>Game Over</h1>
-        <p class="tagline">Silk Board claimed another auto.</p>
+        <p id="gameOverMessage" class="tagline">Silk Board claimed another auto.</p>
         <p class="tagline">Final score: <strong id="finalScore">0</strong></p>
         <button id="tryAgainButton" type="button">Try Again</button>
       </div>
@@ -293,12 +295,15 @@
   <script>
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
-    const GAME_VERSION = "V2";
+    const GAME_VERSION = "V3";
 
     const scoreEl = document.getElementById("score");
     const livesEl = document.getElementById("lives");
     const levelEl = document.getElementById("level");
+    const chaosEl = document.getElementById("chaos");
+    const comboEl = document.getElementById("combo");
     const finalScoreEl = document.getElementById("finalScore");
+    const gameOverMessageEl = document.getElementById("gameOverMessage");
     const startScreen = document.getElementById("startScreen");
     const gameOverScreen = document.getElementById("gameOverScreen");
     const startButton = document.getElementById("startButton");
@@ -329,16 +334,30 @@
     let roadCrowds = [];
     let animals = [];
     let stopBoards = [];
+    let roadHazards = [];
     let floatingTexts = [];
+    let dustPuffs = [];
+    let splashBursts = [];
     let score = 0;
     let lives = START_LIVES;
     let trafficLevel = 1;
+    let chaosMeter = 0;
+    let peakModeTimer = 0;
+    let comboCount = 0;
+    let comboMultiplier = 1;
     let roadOffset = 0;
     let spawnTimer = 0;
     let pedestrianTimer = 0;
     let crowdTimer = 0;
     let animalTimer = 0;
     let stopBoardTimer = 0;
+    let hazardTimer = 0;
+    let cowWarningTimer = 0;
+    let cowEventTimer = 0;
+    let specialMessageTimer = 0;
+    let skidTimer = 0;
+    let skidVelocity = 0;
+    let skidOffset = 0;
     let hitTimer = 0;
     let brakeTimer = 0;
     let messageText = "";
@@ -350,7 +369,26 @@
     let nextCrowdId = 1;
     let nextAnimalId = 1;
     let nextStopBoardId = 1;
+    let nextHazardId = 1;
     let animationId = 0;
+
+    const specialMessages = [
+      "Wrong-side rider spotted!",
+      "BMTC boss fight incoming!",
+      "Rain in 3... 2... 1...",
+      "Auto meter is still running.",
+      "Silk Board energy rising.",
+      "One more quick lane change?"
+    ];
+
+    const gameOverMessages = [
+      "Silk Board claimed another auto.",
+      "You got stuck behind a BMTC bus forever.",
+      "Peak Bangalore traffic unlocked.",
+      "Your auto meter is still running.",
+      "The pothole won this round.",
+      "You almost made it to the office."
+    ];
 
     const trafficTypes = [
       { name: "BUS", color: "#ef4444", roof: "#fee2e2", w: 0.72, h: 1.28, weave: 0.03 },
@@ -394,16 +432,30 @@
       roadCrowds = [];
       animals = [];
       stopBoards = [];
+      roadHazards = [];
       floatingTexts = [];
+      dustPuffs = [];
+      splashBursts = [];
       score = 0;
       lives = START_LIVES;
       trafficLevel = 1;
+      chaosMeter = 0;
+      peakModeTimer = 0;
+      comboCount = 0;
+      comboMultiplier = 1;
       roadOffset = 0;
       spawnTimer = 0.65;
       pedestrianTimer = pedestrianDelay();
       crowdTimer = crowdDelay();
       animalTimer = animalDelay();
       stopBoardTimer = stopBoardDelay();
+      hazardTimer = 2.6;
+      cowWarningTimer = cowWarningDelay();
+      cowEventTimer = 0;
+      specialMessageTimer = specialMessageDelay();
+      skidTimer = 0;
+      skidVelocity = 0;
+      skidOffset = 0;
       hitTimer = 0;
       brakeTimer = 0;
       messageText = "";
@@ -418,6 +470,7 @@
       nextCrowdId = 1;
       nextAnimalId = 1;
       nextStopBoardId = 1;
+      nextHazardId = 1;
       updateHud();
     }
 
@@ -432,6 +485,7 @@
     function endGame() {
       gameState = "over";
       finalScoreEl.textContent = Math.floor(score);
+      gameOverMessageEl.textContent = gameOverMessages[Math.floor(Math.random() * gameOverMessages.length)];
       gameOverScreen.classList.remove("hidden");
     }
 
@@ -459,6 +513,42 @@
       scoreEl.textContent = Math.floor(score);
       livesEl.textContent = lives;
       levelEl.textContent = trafficLevel;
+      chaosEl.textContent = `${Math.floor(chaosMeter)}%`;
+      comboEl.textContent = `x${comboMultiplier}`;
+    }
+
+    function addChaos(amount) {
+      if (peakModeTimer > 0) return;
+      chaosMeter = Math.min(100, chaosMeter + amount);
+      if (chaosMeter >= 100) {
+        peakModeTimer = 15;
+        messageText = "PEAK BANGALORE MODE";
+        messageTimer = 2.2;
+        addFloatingText("PEAK BANGALORE MODE", width / 2, height * 0.34, "#facc15");
+        shakeRoad();
+      }
+    }
+
+    function currentComboMultiplier() {
+      return Math.min(5, 1 + Math.floor(comboCount / 5));
+    }
+
+    function addScoreReward(base, label, x, y, color) {
+      const points = base * comboMultiplier;
+      score += points;
+      addFloatingText(`${label} +${points}`, x, y, color);
+      return points;
+    }
+
+    function recordSafePass(base, label, x, y, color) {
+      comboCount += 1;
+      comboMultiplier = currentComboMultiplier();
+      return addScoreReward(base, label, x, y, color);
+    }
+
+    function resetCombo() {
+      comboCount = 0;
+      comboMultiplier = 1;
     }
 
     function spawnVehicle() {
@@ -540,9 +630,10 @@
     }
 
     function pedestrianDelay() {
-      if (trafficLevel <= 2) return 8.5 + Math.random() * 4.5;
-      if (trafficLevel <= 4) return 6 + Math.random() * 3;
-      return 4.2 + Math.random() * 2.6;
+      const chaosCut = chaosMeter * 0.018 + (peakModeTimer > 0 ? 1.1 : 0);
+      if (trafficLevel <= 2) return Math.max(4.8, 8.5 + Math.random() * 4.5 - chaosCut);
+      if (trafficLevel <= 4) return Math.max(3.8, 6 + Math.random() * 3 - chaosCut);
+      return Math.max(3.1, 4.2 + Math.random() * 2.6 - chaosCut);
     }
 
     function crowdDelay() {
@@ -561,6 +652,23 @@
       if (trafficLevel <= 2) return 8 + Math.random() * 4;
       if (trafficLevel <= 4) return 6.8 + Math.random() * 3.8;
       return 5.4 + Math.random() * 3.2;
+    }
+
+    function hazardDelay() {
+      const chaosCut = chaosMeter * 0.022 + (peakModeTimer > 0 ? 1.3 : 0);
+      if (trafficLevel <= 2) return Math.max(4.4, 7.5 + Math.random() * 4.5 - chaosCut);
+      if (trafficLevel <= 4) return Math.max(3.5, 5.5 + Math.random() * 3.6 - chaosCut);
+      return Math.max(2.7, 4.1 + Math.random() * 2.8 - chaosCut);
+    }
+
+    function cowWarningDelay() {
+      if (trafficLevel <= 2) return 22 + Math.random() * 8;
+      if (trafficLevel <= 4) return 18 + Math.random() * 7;
+      return 15 + Math.random() * 6;
+    }
+
+    function specialMessageDelay() {
+      return 9 + Math.random() * 7;
     }
 
     function canSpawnPedestrian() {
@@ -655,7 +763,7 @@
     function spawnAnimal() {
       if (!canSpawnAnimal()) return false;
 
-      const kind = Math.random() < 0.55 ? "cow" : "dog";
+      const kind = "dog";
       const side = Math.random() < 0.5 ? "left" : "right";
       const direction = side === "left" ? 1 : -1;
       const laneSpan = kind === "cow" ? 1 + Math.floor(Math.random() * 2) : 1 + Math.floor(Math.random() * 3);
@@ -676,6 +784,112 @@
         speedX: laneWidth * (kind === "cow" ? 0.16 : 0.38),
         bob: Math.random() * Math.PI * 2,
         hit: false
+      });
+
+      return true;
+    }
+
+    function canSpawnCowCrossing() {
+      if (cowEventTimer > 0 || animals.some(animal => animal.kind === "cow")) return false;
+      if (pedestrians.length > 0 || stopBoards.length > 0) return false;
+
+      const busyLanes = new Set();
+      for (const vehicle of vehicles) {
+        if (vehicle.y > -80 && vehicle.y < height * 0.62) busyLanes.add(vehicle.lane);
+      }
+
+      const blockingHazards = roadHazards.filter(hazard => hazard.kind === "barricade" && hazard.y > -80 && hazard.y < height * 0.6);
+      return busyLanes.size < 3 && blockingHazards.length < 1;
+    }
+
+    function startCowWarning() {
+      if (!canSpawnCowCrossing()) return false;
+      cowEventTimer = 1.55;
+      messageText = "COW CROSSING!";
+      messageTimer = 1.55;
+      return true;
+    }
+
+    function spawnCowCrossing() {
+      if (!canSpawnCowCrossing()) return false;
+
+      const side = Math.random() < 0.5 ? "left" : "right";
+      const direction = side === "left" ? 1 : -1;
+      const startX = side === "left" ? roadLeft - laneWidth * 0.5 : roadLeft + roadWidth + laneWidth * 0.5;
+      const endX = side === "left" ? roadLeft + roadWidth - laneWidth * 0.35 : roadLeft + laneWidth * 0.35;
+
+      animals.push({
+        id: nextAnimalId++,
+        kind: "cow",
+        direction,
+        x: startX,
+        y: height * (0.32 + Math.random() * 0.14),
+        endX,
+        w: laneWidth * 0.62,
+        h: laneWidth * 0.46,
+        speedX: laneWidth * 0.13,
+        bob: Math.random() * Math.PI * 2,
+        hit: false,
+        safeAwarded: false,
+        nearMissAwarded: false,
+        warned: true
+      });
+
+      return true;
+    }
+
+    function canSpawnRoadHazard(kind) {
+      if (roadHazards.length >= (peakModeTimer > 0 ? 4 : 3)) return false;
+      if (kind === "barricade" && (pedestrians.length > 0 || animals.some(animal => animal.kind === "cow"))) return false;
+
+      const topTraffic = vehicles.filter(vehicle => vehicle.y > -90 && vehicle.y < height * 0.54);
+      const blockingHazards = roadHazards.filter(hazard => hazard.blocksLane && hazard.y > -80 && hazard.y < height * 0.54);
+      const blockedLanes = new Set();
+
+      for (const vehicle of topTraffic) blockedLanes.add(vehicle.targetLane);
+      for (const hazard of blockingHazards) blockedLanes.add(hazard.lane);
+
+      return blockedLanes.size < LANE_COUNT - 1 || kind !== "barricade";
+    }
+
+    function spawnRoadHazard() {
+      const roll = Math.random();
+      const kind = roll < 0.38 ? "pothole" : roll < 0.68 ? "puddle" : "barricade";
+      if (!canSpawnRoadHazard(kind)) return false;
+
+      const blockedLanes = new Set();
+      for (const vehicle of vehicles) {
+        if (vehicle.y > -100 && vehicle.y < height * 0.45) blockedLanes.add(vehicle.targetLane);
+      }
+      for (const hazard of roadHazards) {
+        if (hazard.blocksLane && hazard.y > -90 && hazard.y < height * 0.5) blockedLanes.add(hazard.lane);
+      }
+
+      const candidateLanes = [];
+      for (let lane = 0; lane < LANE_COUNT; lane++) {
+        if (kind !== "barricade" || !blockedLanes.has(lane)) candidateLanes.push(lane);
+      }
+      if (!candidateLanes.length) return false;
+
+      const lane = candidateLanes[Math.floor(Math.random() * candidateLanes.length)];
+      const isBarricade = kind === "barricade";
+      const isPuddle = kind === "puddle";
+      const w = laneWidth * (isBarricade ? 0.72 : isPuddle ? 0.42 : 0.3);
+      const h = laneWidth * (isBarricade ? 0.54 : isPuddle ? 0.2 : 0.17);
+
+      roadHazards.push({
+        id: nextHazardId++,
+        kind,
+        lane,
+        x: laneCenter(lane) + (isBarricade ? 0 : (Math.random() - 0.5) * laneWidth * 0.28),
+        y: -h - 28,
+        w,
+        h,
+        blocksLane: isBarricade,
+        hit: false,
+        passed: false,
+        nearMissAwarded: false,
+        wobble: Math.random() * Math.PI * 2
       });
 
       return true;
@@ -732,21 +946,34 @@
     }
 
     function update(dt) {
-      const baseSpeed = 235 + trafficLevel * 34;
+      const peakBoost = peakModeTimer > 0 ? 1.14 : 1;
+      const chaosBoost = 1 + chaosMeter * 0.0018;
+      const baseSpeed = (235 + trafficLevel * 34) * peakBoost * chaosBoost;
       const speed = brakeTimer > 0 ? baseSpeed * 0.42 : baseSpeed;
       roadOffset = (roadOffset + speed * dt) % 58;
       score += dt * 8;
       trafficLevel = Math.min(9, 1 + Math.floor(score / 260));
+      if (peakModeTimer > 0) {
+        peakModeTimer = Math.max(0, peakModeTimer - dt);
+        if (peakModeTimer === 0) {
+          chaosMeter = 40;
+          messageText = "Chaos cooled to 40%";
+          messageTimer = 1.4;
+        }
+      } else {
+        addChaos(dt * (1.2 + trafficLevel * 0.18));
+      }
       hitTimer = Math.max(0, hitTimer - dt);
       brakeTimer = Math.max(0, brakeTimer - dt);
       messageTimer = Math.max(0, messageTimer - dt);
+      skidTimer = Math.max(0, skidTimer - dt);
 
       updatePlayerPosition(dt);
 
       spawnTimer -= dt;
       if (spawnTimer <= 0) {
         spawnVehicle();
-        const pressure = Math.max(0.34, 1.04 - trafficLevel * 0.075);
+        const pressure = Math.max(0.26, 1.04 - trafficLevel * 0.075 - chaosMeter * 0.002 - (peakModeTimer > 0 ? 0.12 : 0));
         spawnTimer = pressure + Math.random() * 0.34;
       }
 
@@ -774,21 +1001,49 @@
         stopBoardTimer = spawned ? stopBoardDelay() : 1.4;
       }
 
+      hazardTimer -= dt;
+      if (hazardTimer <= 0) {
+        const spawned = spawnRoadHazard();
+        hazardTimer = spawned ? hazardDelay() : 1.1;
+      }
+
+      if (cowEventTimer > 0) {
+        cowEventTimer = Math.max(0, cowEventTimer - dt);
+        if (cowEventTimer === 0) spawnCowCrossing();
+      } else {
+        cowWarningTimer -= dt;
+        if (cowWarningTimer <= 0) {
+          const warned = startCowWarning();
+          cowWarningTimer = warned ? cowWarningDelay() : 3.5;
+        }
+      }
+
+      specialMessageTimer -= dt;
+      if (specialMessageTimer <= 0 && messageTimer <= 0) {
+        messageText = specialMessages[Math.floor(Math.random() * specialMessages.length)];
+        messageTimer = 1.35;
+        specialMessageTimer = specialMessageDelay();
+      }
+
       for (const vehicle of vehicles) {
         vehicle.y += speed * vehicle.speedBoost * dt;
         updateVehicleMovement(vehicle, dt);
 
         if (!vehicle.passed && vehicle.y > playerY + playerH * 0.5) {
           vehicle.passed = true;
-          score += 10;
+          recordSafePass(10, "SAFE PASS", vehicle.x, vehicle.y - vehicle.h * 0.3, "#22c55e");
         }
+
+        if (Math.random() < dt * 8) addDust(vehicle.x, vehicle.y + vehicle.h * 0.42, vehicle.type.color);
       }
 
       updatePedestrians(dt, speed);
       updateRoadCrowds(dt, speed);
       updateAnimals(dt, speed);
       updateStopBoards(dt, speed);
+      updateRoadHazards(dt, speed);
       updateFloatingTexts(dt);
+      updateEffects(dt);
 
       vehicles = vehicles.filter(vehicle => vehicle.y < height + vehicle.h + 50);
       pedestrians = pedestrians.filter(pedestrian => {
@@ -805,7 +1060,10 @@
         return animal.y < height + animal.h + 50 && !exitedSide;
       });
       stopBoards = stopBoards.filter(board => board.y < height + board.h + 50);
+      roadHazards = roadHazards.filter(hazard => hazard.y < height + hazard.h + 60);
       floatingTexts = floatingTexts.filter(text => text.life > 0);
+      dustPuffs = dustPuffs.filter(puff => puff.life > 0);
+      splashBursts = splashBursts.filter(splash => splash.life > 0);
       checkCollisions();
       updateHud();
     }
@@ -818,8 +1076,7 @@
 
         if (!pedestrian.safeAwarded && !pedestrian.hit && pedestrian.y > playerY + playerH * 0.62) {
           pedestrian.safeAwarded = true;
-          score += 25;
-          addFloatingText("SAFE PASS +25", pedestrian.x, pedestrian.y - pedestrian.h, "#22c55e");
+          recordSafePass(25, "SAFE PASS", pedestrian.x, pedestrian.y - pedestrian.h, "#22c55e");
         }
       }
     }
@@ -836,6 +1093,14 @@
         animal.y += roadSpeed * (animal.kind === "cow" ? 0.22 : 0.3) * dt;
         animal.x += animal.direction * animal.speedX * dt;
         animal.bob += dt * (animal.kind === "cow" ? 4 : 9);
+
+        const exited = animal.direction > 0
+          ? animal.x > animal.endX + laneWidth * 0.15
+          : animal.x < animal.endX - laneWidth * 0.15;
+        if (!animal.safeAwarded && !animal.hit && exited) {
+          animal.safeAwarded = true;
+          recordSafePass(animal.kind === "cow" ? 30 : 20, "SAFE PASS", animal.x, animal.y - animal.h, "#22c55e");
+        }
       }
     }
 
@@ -843,6 +1108,23 @@
       for (const board of stopBoards) {
         board.y += roadSpeed * 0.92 * dt;
         board.bob += dt * 5;
+
+        if (!board.passed && board.y > playerY + playerH * 0.55) {
+          board.passed = true;
+          recordSafePass(12, "SAFE PASS", board.x, board.y - board.h, "#22c55e");
+        }
+      }
+    }
+
+    function updateRoadHazards(dt, roadSpeed) {
+      for (const hazard of roadHazards) {
+        hazard.y += roadSpeed * (hazard.kind === "puddle" ? 0.82 : 0.9) * dt;
+        hazard.wobble += dt * 5;
+
+        if (!hazard.passed && hazard.y > playerY + playerH * 0.55) {
+          hazard.passed = true;
+          recordSafePass(hazard.kind === "puddle" ? 6 : 12, "SAFE PASS", hazard.x, hazard.y - hazard.h, "#22c55e");
+        }
       }
     }
 
@@ -864,28 +1146,102 @@
       });
     }
 
+    function addDust(x, y, color) {
+      dustPuffs.push({
+        x: x + (Math.random() - 0.5) * laneWidth * 0.18,
+        y,
+        r: 3 + Math.random() * 5,
+        color,
+        life: 0.42,
+        maxLife: 0.42
+      });
+    }
+
+    function addSplash(x, y) {
+      for (let i = 0; i < 8; i++) {
+        splashBursts.push({
+          x,
+          y,
+          vx: (Math.random() - 0.5) * 90,
+          vy: -30 - Math.random() * 55,
+          life: 0.45,
+          maxLife: 0.45
+        });
+      }
+    }
+
+    function updateEffects(dt) {
+      for (const puff of dustPuffs) {
+        puff.y += 28 * dt;
+        puff.r += 14 * dt;
+        puff.life -= dt;
+      }
+
+      for (const splash of splashBursts) {
+        splash.x += splash.vx * dt;
+        splash.y += splash.vy * dt;
+        splash.vy += 160 * dt;
+        splash.life -= dt;
+      }
+    }
+
     function updatePlayerPosition(dt) {
       if (laneSwitchTimer <= 0) {
         playerX = targetPlayerX;
-        return;
+      } else {
+        laneSwitchTimer = Math.max(0, laneSwitchTimer - dt);
+        const progress = 1 - laneSwitchTimer / LANE_SWITCH_TIME;
+        const eased = 1 - Math.pow(1 - progress, 3);
+        playerX = laneStartX + (targetPlayerX - laneStartX) * eased;
+
+        if (laneSwitchTimer === 0) {
+          playerX = targetPlayerX;
+        }
       }
 
-      laneSwitchTimer = Math.max(0, laneSwitchTimer - dt);
-      const progress = 1 - laneSwitchTimer / LANE_SWITCH_TIME;
-      const eased = 1 - Math.pow(1 - progress, 3);
-      playerX = laneStartX + (targetPlayerX - laneStartX) * eased;
-
-      if (laneSwitchTimer === 0) {
-        playerX = targetPlayerX;
+      if (skidTimer > 0) {
+        skidOffset += skidVelocity * dt;
+        skidVelocity *= Math.pow(0.12, dt);
+        skidOffset = Math.max(-laneWidth * 0.32, Math.min(laneWidth * 0.32, skidOffset));
+      } else {
+        skidOffset *= Math.pow(0.04, dt);
       }
+
+      playerX = Math.max(
+        roadLeft + laneWidth * 0.35,
+        Math.min(roadLeft + roadWidth - laneWidth * 0.35, playerX + skidOffset)
+      );
+    }
+
+    function boxesIntersect(a, b) {
+      return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+    }
+
+    function expandedBox(box, padX, padY) {
+      return {
+        left: box.left - padX,
+        right: box.right + padX,
+        top: box.top - padY,
+        bottom: box.bottom + padY
+      };
+    }
+
+    function awardNearMiss(item, itemBox, playerBox) {
+      if (item.nearMissAwarded || boxesIntersect(playerBox, itemBox)) return;
+      const nearBox = expandedBox(itemBox, laneWidth * 0.16, laneWidth * 0.12);
+      if (!boxesIntersect(playerBox, nearBox)) return;
+
+      item.nearMissAwarded = true;
+      addChaos(3.5);
+      recordSafePass(25, "NEAR MISS", playerX, playerY - playerH * 0.68, "#facc15");
     }
 
     function checkCollisions() {
       if (hitTimer > 0) return;
 
       const playerBox = {
-        left: targetPlayerX - playerW * 0.39,
-        right: targetPlayerX + playerW * 0.39,
+        left: playerX - playerW * 0.39,
+        right: playerX + playerW * 0.39,
         top: playerY - playerH * 0.43,
         bottom: playerY + playerH * 0.43
       };
@@ -899,13 +1255,11 @@
           bottom: vehicle.y + vehicle.h * 0.44
         };
 
-        const hit = playerBox.left < box.right &&
-          playerBox.right > box.left &&
-          playerBox.top < box.bottom &&
-          playerBox.bottom > box.top;
+        const hit = boxesIntersect(playerBox, box);
 
         if (hit) {
           lives -= 1;
+          resetCombo();
           hitTimer = 1.05;
           brakeTimer = 0.55;
           vehicles.splice(i, 1);
@@ -913,6 +1267,8 @@
           if (lives <= 0) endGame();
           break;
         }
+
+        awardNearMiss(vehicle, box, playerBox);
       }
 
       if (gameState === "over") return;
@@ -928,24 +1284,24 @@
           bottom: animal.y + animal.h * 0.42
         };
 
-        const animalNearMiss = playerBox.left < box.right &&
-          playerBox.right > box.left &&
-          playerBox.top < box.bottom &&
-          playerBox.bottom > box.top;
+        const animalNearMiss = boxesIntersect(playerBox, box);
 
         if (animalNearMiss) {
           lives -= 1;
+          resetCombo();
           hitTimer = 1.18;
           brakeTimer = animal.kind === "cow" ? 0.95 : 0.72;
           animal.hit = true;
           animals.splice(i, 1);
-          messageText = animal.kind === "cow" ? "Careful! Cow on road!" : "Careful! Dog on road!";
+          messageText = animal.kind === "cow" ? "Holy traffic jam!" : "Careful! Dog on road!";
           messageTimer = 1.6;
-          addFloatingText("BRAKE!", targetPlayerX, playerY - playerH * 0.7, "#ef4444");
+          addFloatingText("BRAKE!", playerX, playerY - playerH * 0.7, "#ef4444");
           shakeRoad();
           if (lives <= 0) endGame();
           break;
         }
+
+        awardNearMiss(animal, box, playerBox);
       }
 
       if (gameState === "over") return;
@@ -961,24 +1317,66 @@
           bottom: board.y + board.h * 0.42
         };
 
-        const stopBoardHit = playerBox.left < box.right &&
-          playerBox.right > box.left &&
-          playerBox.top < box.bottom &&
-          playerBox.bottom > box.top;
+        const stopBoardHit = boxesIntersect(playerBox, box);
 
         if (stopBoardHit) {
           lives -= 1;
+          resetCombo();
           hitTimer = 1.05;
           brakeTimer = 0.8;
           board.hit = true;
           stopBoards.splice(i, 1);
           messageText = "Careful! STOP board!";
           messageTimer = 1.6;
-          addFloatingText("BRAKE!", targetPlayerX, playerY - playerH * 0.7, "#ef4444");
+          addFloatingText("BRAKE!", playerX, playerY - playerH * 0.7, "#ef4444");
           shakeRoad();
           if (lives <= 0) endGame();
           break;
         }
+
+        awardNearMiss(board, box, playerBox);
+      }
+
+      if (gameState === "over") return;
+
+      for (let i = 0; i < roadHazards.length; i++) {
+        const hazard = roadHazards[i];
+        if (hazard.hit) continue;
+
+        const box = {
+          left: hazard.x - hazard.w * 0.46,
+          right: hazard.x + hazard.w * 0.46,
+          top: hazard.y - hazard.h * 0.5,
+          bottom: hazard.y + hazard.h * 0.5
+        };
+
+        const hazardHit = boxesIntersect(playerBox, box);
+
+        if (hazardHit) {
+          hazard.hit = true;
+          roadHazards.splice(i, 1);
+
+          if (hazard.kind === "puddle") {
+            skidTimer = 0.5;
+            skidVelocity = (Math.random() < 0.5 ? -1 : 1) * laneWidth * 0.85;
+            messageText = "Skid!";
+            messageTimer = 1.1;
+            addSplash(playerX, playerY + playerH * 0.25);
+          } else {
+            lives -= 1;
+            resetCombo();
+            hitTimer = 1.05;
+            brakeTimer = hazard.kind === "barricade" ? 0.82 : 0.62;
+            messageText = hazard.kind === "barricade" ? "Metro work ahead!" : "Pothole hit!";
+            messageTimer = 1.5;
+            addFloatingText("BRAKE!", playerX, playerY - playerH * 0.7, "#ef4444");
+            shakeRoad();
+            if (lives <= 0) endGame();
+          }
+          break;
+        }
+
+        if (hazard.kind !== "puddle") awardNearMiss(hazard, box, playerBox);
       }
 
       if (gameState === "over") return;
@@ -994,24 +1392,24 @@
           bottom: pedestrian.y + pedestrian.h * 0.42
         };
 
-        const nearMiss = playerBox.left < box.right &&
-          playerBox.right > box.left &&
-          playerBox.top < box.bottom &&
-          playerBox.bottom > box.top;
+        const nearMiss = boxesIntersect(playerBox, box);
 
         if (nearMiss) {
           lives -= 1;
+          resetCombo();
           hitTimer = 1.2;
           brakeTimer = 0.8;
           pedestrian.hit = true;
           pedestrians.splice(i, 1);
           messageText = "Careful! Pedestrian crossing!";
           messageTimer = 1.6;
-          addFloatingText("BRAKE!", targetPlayerX, playerY - playerH * 0.7, "#ef4444");
+          addFloatingText("BRAKE!", playerX, playerY - playerH * 0.7, "#ef4444");
           shakeRoad();
           if (lives <= 0) endGame();
           break;
         }
+
+        awardNearMiss(pedestrian, box, playerBox);
       }
     }
 
@@ -1026,13 +1424,17 @@
       drawCityEdges();
       drawRoadCrowds();
       drawRoad();
+      drawDustPuffs();
+      drawRoadHazards();
       drawPedestrians();
       drawAnimals();
       drawVehicles();
       drawStopBoards();
+      drawSplashes();
       drawPlayer();
       drawFloatingTexts();
       drawMessage();
+      drawPeakBanner();
 
       if (gameState === "paused") {
         drawPause();
@@ -1040,7 +1442,7 @@
     }
 
     function drawCityEdges() {
-      ctx.fillStyle = "#66c98a";
+      ctx.fillStyle = peakModeTimer > 0 ? "#7ddf8d" : "#66c98a";
       ctx.fillRect(0, 0, width, height);
 
       ctx.fillStyle = "#8ee3a1";
@@ -1054,6 +1456,12 @@
       ctx.fillStyle = "rgba(255, 246, 214, 0.42)";
       ctx.fillRect(0, 0, Math.max(0, roadLeft - 24), height);
       ctx.fillRect(roadLeft + roadWidth + 24, 0, Math.max(0, width - roadLeft - roadWidth - 24), height);
+
+      if (peakModeTimer > 0) {
+        const pulse = 0.5 + Math.sin(performance.now() / 130) * 0.5;
+        ctx.fillStyle = `rgba(251, 146, 60, ${0.08 + pulse * 0.12})`;
+        ctx.fillRect(0, 0, width, height);
+      }
     }
 
     function drawPedestrians() {
@@ -1454,12 +1862,6 @@
       ctx.lineTo(roadLeft + roadWidth, height);
       ctx.stroke();
 
-      for (let y = -260 + roadOffset; y < height + 220; y += 560) {
-        drawPothole(roadLeft + laneWidth * 0.72, y, laneWidth * 0.13, laneWidth * 0.064, -0.2);
-        if (trafficLevel >= 6) {
-          drawPothole(roadLeft + laneWidth * 2.78, y + 280, laneWidth * 0.11, laneWidth * 0.054, 0.25);
-        }
-      }
     }
 
     function drawPothole(x, y, radiusX, radiusY, rotation) {
@@ -1472,6 +1874,113 @@
       ctx.beginPath();
       ctx.ellipse(x - radiusX * 0.25, y - radiusY * 0.25, radiusX * 0.45, radiusY * 0.24, rotation, 0, Math.PI * 2);
       ctx.fill();
+    }
+
+    function drawRoadHazards() {
+      for (const hazard of roadHazards) {
+        if (hazard.kind === "pothole") {
+          drawLevelPothole(hazard);
+        } else if (hazard.kind === "puddle") {
+          drawPuddle(hazard);
+        } else {
+          drawBarricade(hazard);
+        }
+      }
+    }
+
+    function drawLevelPothole(hazard) {
+      ctx.save();
+      ctx.translate(hazard.x, hazard.y);
+      ctx.rotate(Math.sin(hazard.wobble) * 0.08);
+      ctx.fillStyle = "#111827";
+      ctx.beginPath();
+      ctx.ellipse(0, 0, hazard.w * 0.5, hazard.h * 0.58, 0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#020617";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(248, 250, 252, 0.22)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-hazard.w * 0.43, -hazard.h * 0.04);
+      ctx.lineTo(-hazard.w * 0.64, -hazard.h * 0.24);
+      ctx.moveTo(-hazard.w * 0.18, hazard.h * 0.18);
+      ctx.lineTo(-hazard.w * 0.34, hazard.h * 0.45);
+      ctx.moveTo(hazard.w * 0.2, -hazard.h * 0.13);
+      ctx.lineTo(hazard.w * 0.48, -hazard.h * 0.32);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawPuddle(hazard) {
+      ctx.save();
+      ctx.translate(hazard.x, hazard.y);
+      ctx.fillStyle = "rgba(56, 189, 248, 0.72)";
+      ctx.beginPath();
+      ctx.ellipse(0, 0, hazard.w * 0.55, hazard.h * 0.58, Math.sin(hazard.wobble) * 0.08, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(224, 242, 254, 0.68)";
+      ctx.beginPath();
+      ctx.ellipse(-hazard.w * 0.16, -hazard.h * 0.1, hazard.w * 0.22, hazard.h * 0.12, -0.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawBarricade(hazard) {
+      ctx.save();
+      ctx.translate(hazard.x, hazard.y);
+      ctx.fillStyle = "rgba(0, 0, 0, 0.24)";
+      ctx.beginPath();
+      ctx.ellipse(0, hazard.h * 0.38, hazard.w * 0.5, hazard.h * 0.14, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#fb923c";
+      ctx.strokeStyle = "#111827";
+      ctx.lineWidth = 3;
+      roundRect(-hazard.w * 0.5, -hazard.h * 0.34, hazard.w, hazard.h * 0.56, 5);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.strokeStyle = "#fff7ed";
+      ctx.lineWidth = Math.max(4, hazard.h * 0.1);
+      ctx.beginPath();
+      ctx.moveTo(-hazard.w * 0.38, hazard.h * 0.12);
+      ctx.lineTo(-hazard.w * 0.08, -hazard.h * 0.28);
+      ctx.moveTo(-hazard.w * 0.02, hazard.h * 0.14);
+      ctx.lineTo(hazard.w * 0.28, -hazard.h * 0.28);
+      ctx.stroke();
+
+      ctx.fillStyle = "#111827";
+      ctx.fillRect(-hazard.w * 0.42, hazard.h * 0.2, hazard.w * 0.12, hazard.h * 0.26);
+      ctx.fillRect(hazard.w * 0.3, hazard.h * 0.2, hazard.w * 0.12, hazard.h * 0.26);
+      ctx.restore();
+    }
+
+    function drawDustPuffs() {
+      for (const puff of dustPuffs) {
+        const alpha = Math.max(0, puff.life / puff.maxLife) * 0.22;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = puff.color;
+        ctx.beginPath();
+        ctx.arc(puff.x, puff.y, puff.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    function drawSplashes() {
+      for (const splash of splashBursts) {
+        const alpha = Math.max(0, splash.life / splash.maxLife);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = "#38bdf8";
+        ctx.beginPath();
+        ctx.arc(splash.x, splash.y, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
     }
 
     function drawStopBoard(board) {
@@ -1866,6 +2375,27 @@
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(messageText, 0, 0);
+      ctx.restore();
+    }
+
+    function drawPeakBanner() {
+      if (peakModeTimer <= 0) return;
+
+      const pulse = 0.5 + Math.sin(performance.now() / 120) * 0.5;
+      ctx.save();
+      ctx.globalAlpha = 0.88 + pulse * 0.12;
+      ctx.translate(width / 2, height * 0.12);
+      ctx.fillStyle = "#ef4444";
+      ctx.strokeStyle = "#111827";
+      ctx.lineWidth = 4;
+      roundRect(-roadWidth * 0.44, -22, roadWidth * 0.88, 44, 8);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#fff6d6";
+      ctx.font = `900 ${Math.max(17, roadWidth * 0.052)}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("PEAK BANGALORE MODE", 0, 0);
       ctx.restore();
     }
 
