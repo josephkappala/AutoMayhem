@@ -58,17 +58,19 @@
 
     .hud {
       position: absolute;
-      inset: 12px 12px auto 12px;
+      top: 12px;
+      left: 11%;
+      right: 11%;
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
+      gap: 6px;
       pointer-events: none;
       z-index: 2;
     }
 
     .stat {
       min-width: 0;
-      padding: 8px 9px;
+      padding: 7px 6px;
       border: 2px solid rgba(17, 24, 39, 0.9);
       border-radius: 8px;
       background: #fff6d6;
@@ -79,7 +81,7 @@
     .stat span {
       display: block;
       color: #475569;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 800;
       line-height: 1;
       text-transform: uppercase;
@@ -89,7 +91,7 @@
       display: block;
       margin-top: 3px;
       color: #111827;
-      font-size: clamp(16px, 4vw, 21px);
+      font-size: clamp(15px, 3.4vw, 19px);
       line-height: 1.05;
     }
 
@@ -205,12 +207,22 @@
       }
 
       .hud {
-        inset: 10px 8px auto 8px;
-        gap: 5px;
+        top: 10px;
+        left: 11%;
+        right: 11%;
+        gap: 4px;
       }
 
       .stat {
-        padding: 7px 5px;
+        padding: 6px 4px;
+      }
+
+      .stat span {
+        font-size: 9px;
+      }
+
+      .stat strong {
+        font-size: clamp(14px, 4.1vw, 17px);
       }
 
       .panel {
