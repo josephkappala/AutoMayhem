@@ -958,6 +958,108 @@
       ctx.ellipse(0, h * 0.43, w * 0.43, h * 0.12, 0, 0, Math.PI * 2);
       ctx.fill();
 
+      if (type.name === "BUS") {
+        drawBusShape(w, h, type);
+      } else if (type.name === "CAB") {
+        drawCabShape(w, h, type);
+      } else if (type.name === "VAN") {
+        drawVanShape(w, h, type);
+      } else if (type.name === "TEMPO") {
+        drawTempoShape(w, h, type);
+      } else {
+        drawCarShape(w, h, type);
+      }
+
+      ctx.restore();
+    }
+
+    function drawBusShape(w, h, type) {
+      ctx.fillStyle = type.color;
+      roundRect(-w * 0.5, -h * 0.5, w, h, 6);
+      ctx.fill();
+
+      ctx.fillStyle = "#fee2e2";
+      ctx.fillRect(-w * 0.4, -h * 0.42, w * 0.8, h * 0.18);
+      ctx.fillStyle = "#111827";
+      ctx.font = `900 ${Math.max(9, w * 0.16)}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("BMTC", 0, -h * 0.33);
+
+      ctx.fillStyle = "#dbeafe";
+      for (let i = 0; i < 3; i++) {
+        ctx.fillRect(-w * 0.36 + i * w * 0.26, -h * 0.16, w * 0.18, h * 0.18);
+      }
+
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillRect(-w * 0.34, h * 0.34, w * 0.68, h * 0.08);
+      drawSideWheels(w, h, 0.34, 0.16);
+    }
+
+    function drawCabShape(w, h, type) {
+      ctx.fillStyle = type.color;
+      roundRect(-w * 0.46, -h * 0.46, w * 0.92, h * 0.92, 14);
+      ctx.fill();
+
+      ctx.fillStyle = "#111827";
+      roundRect(-w * 0.3, -h * 0.22, w * 0.6, h * 0.36, 6);
+      ctx.fill();
+
+      ctx.fillStyle = "#f8fafc";
+      for (let i = 0; i < 4; i++) {
+        ctx.fillRect(-w * 0.34 + i * w * 0.18, h * 0.23, w * 0.09, h * 0.06);
+      }
+
+      ctx.fillStyle = "#111827";
+      ctx.font = `900 ${Math.max(9, w * 0.17)}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("TAXI", 0, h * 0.34);
+      drawSideWheels(w, h, 0.31, 0.15);
+    }
+
+    function drawVanShape(w, h, type) {
+      ctx.fillStyle = type.color;
+      roundRect(-w * 0.48, -h * 0.48, w * 0.96, h * 0.96, 7);
+      ctx.fill();
+
+      ctx.fillStyle = type.roof;
+      roundRect(-w * 0.33, -h * 0.34, w * 0.66, h * 0.26, 5);
+      ctx.fill();
+
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillRect(-w * 0.38, h * 0.18, w * 0.76, h * 0.12);
+      ctx.fillStyle = "#111827";
+      ctx.font = `900 ${Math.max(9, w * 0.16)}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("VAN", 0, h * 0.25);
+      drawSideWheels(w, h, 0.34, 0.17);
+    }
+
+    function drawTempoShape(w, h, type) {
+      ctx.fillStyle = "#dcfce7";
+      roundRect(-w * 0.46, -h * 0.47, w * 0.92, h * 0.42, 7);
+      ctx.fill();
+
+      ctx.fillStyle = type.color;
+      roundRect(-w * 0.5, -h * 0.08, w, h * 0.56, 8);
+      ctx.fill();
+
+      ctx.fillStyle = "#14532d";
+      ctx.fillRect(-w * 0.36, h * 0.02, w * 0.72, h * 0.08);
+      ctx.fillRect(-w * 0.36, h * 0.18, w * 0.72, h * 0.08);
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillRect(-w * 0.28, -h * 0.37, w * 0.56, h * 0.16);
+      ctx.fillStyle = "#111827";
+      ctx.font = `900 ${Math.max(8, w * 0.14)}px system-ui, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("LOAD", 0, h * 0.35);
+      drawSideWheels(w, h, 0.35, 0.17);
+    }
+
+    function drawCarShape(w, h, type) {
       ctx.fillStyle = type.color;
       roundRect(-w / 2, -h / 2, w, h, 8);
       ctx.fill();
@@ -965,22 +1067,19 @@
       ctx.fillStyle = type.roof;
       roundRect(-w * 0.33, -h * 0.26, w * 0.66, h * 0.38, 5);
       ctx.fill();
+      drawSideWheels(w, h, 0.32, 0.15);
+    }
 
+    function drawSideWheels(w, h, yOffset, wheelH) {
       ctx.fillStyle = "#111827";
-      ctx.font = `900 ${Math.max(10, w * 0.18)}px system-ui, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(type.name, 0, h * 0.23);
+      ctx.fillRect(-w * 0.54, -h * 0.32, w * 0.1, h * wheelH);
+      ctx.fillRect(w * 0.44, -h * 0.32, w * 0.1, h * wheelH);
+      ctx.fillRect(-w * 0.54, h * yOffset, w * 0.1, h * wheelH);
+      ctx.fillRect(w * 0.44, h * yOffset, w * 0.1, h * wheelH);
 
       ctx.fillStyle = "#f8fafc";
-      ctx.fillRect(-w * 0.36, -h * 0.44, w * 0.18, h * 0.08);
-      ctx.fillRect(w * 0.18, -h * 0.44, w * 0.18, h * 0.08);
-      ctx.fillStyle = "#111827";
-      ctx.fillRect(-w * 0.52, -h * 0.32, w * 0.1, h * 0.22);
-      ctx.fillRect(w * 0.42, -h * 0.32, w * 0.1, h * 0.22);
-      ctx.fillRect(-w * 0.52, h * 0.13, w * 0.1, h * 0.22);
-      ctx.fillRect(w * 0.42, h * 0.13, w * 0.1, h * 0.22);
-      ctx.restore();
+      ctx.fillRect(-w * 0.26, h * 0.41, w * 0.16, h * 0.06);
+      ctx.fillRect(w * 0.1, h * 0.41, w * 0.16, h * 0.06);
     }
 
     function drawTwoWheeler(vehicle) {
