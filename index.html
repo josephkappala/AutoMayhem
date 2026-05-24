@@ -60,12 +60,30 @@
       position: absolute;
       top: 12px;
       left: 11%;
-      right: 11%;
+      right: 24%;
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 6px;
       pointer-events: none;
       z-index: 2;
+    }
+
+    .mini-title {
+      position: absolute;
+      top: 55px;
+      left: 12px;
+      z-index: 2;
+      padding: 5px 8px;
+      border: 2px solid rgba(17, 24, 39, 0.85);
+      border-radius: 8px;
+      background: rgba(255, 246, 214, 0.86);
+      color: #111827;
+      font-size: 9px;
+      font-weight: 950;
+      letter-spacing: 0.4px;
+      line-height: 1;
+      pointer-events: none;
+      box-shadow: 0 2px 0 rgba(17, 24, 39, 0.8);
     }
 
     .stat {
@@ -206,6 +224,31 @@
       box-shadow: 0 2px 0 #111827;
     }
 
+    .sound-toggle {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 4;
+      width: auto;
+      min-width: 92px;
+      min-height: 36px;
+      margin: 0;
+      padding: 8px 10px;
+      border: 2px solid rgba(255, 246, 214, 0.55);
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.74);
+      color: #fff6d6;
+      font-size: 12px;
+      font-weight: 900;
+      box-shadow: 0 3px 0 rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(4px);
+    }
+
+    .sound-toggle:active {
+      transform: translateY(2px);
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+    }
+
     .hidden {
       display: none;
     }
@@ -230,8 +273,22 @@
       .hud {
         top: 10px;
         left: 11%;
-        right: 11%;
+        right: 25%;
         gap: 4px;
+      }
+
+      .mini-title {
+        top: 56px;
+        left: 10px;
+        font-size: 8px;
+        padding: 5px 7px;
+      }
+
+      .sound-toggle {
+        min-width: 104px;
+        min-height: 42px;
+        padding: 9px 12px;
+        font-size: 13px;
       }
 
       .stat {
@@ -277,6 +334,8 @@
 <body>
   <main class="shell" aria-label="Auto Mayhem: Silk Board Run game">
     <canvas id="game" width="560" height="860"></canvas>
+    <div class="mini-title" aria-hidden="true">AUTO MAYHEM</div>
+    <button id="soundToggle" class="sound-toggle" type="button" aria-pressed="false">🔊 Sound</button>
 
     <section class="hud" aria-live="polite">
       <div class="stat"><span>Score</span><strong id="score">0</strong></div>
@@ -288,13 +347,14 @@
     <section id="startScreen" class="overlay">
       <div class="panel">
         <div class="version-badge">Version 3</div>
-        <h1>Auto Mayhem:<br>Silk Board Run</h1>
-        <p class="tagline">Dodge buses, scooters, pedestrians, potholes, puddles, and Bangalore road drama.</p>
+        <h1>AUTO MAYHEM</h1>
+        <p class="tagline"><strong>Silk Board Run</strong></p>
+        <p class="tagline">Survive Indian traffic. Change lanes. Don’t trust anyone.</p>
         <div class="keys">
           <div class="key">Left Arrow: lane left</div>
           <div class="key">Right Arrow: lane right</div>
           <div class="key">Space / Enter: start</div>
-          <div class="key">P: pause</div>
+          <div class="key">P: pause / M: mute</div>
         </div>
         <button id="startButton" type="button">Start Meter</button>
         <p class="small">Mobile: tap left or right side</p>
@@ -328,6 +388,7 @@
     const gameOverScreen = document.getElementById("gameOverScreen");
     const startButton = document.getElementById("startButton");
     const tryAgainButton = document.getElementById("tryAgainButton");
+    const soundToggle = document.getElementById("soundToggle");
 
     const LANE_COUNT = 4;
     const START_LIVES = 3;
@@ -391,6 +452,9 @@
     let nextStopBoardId = 1;
     let nextHazardId = 1;
     let animationId = 0;
+    let audioContext = null;
+    let audioMaster = null;
+    let muted = false;
 
     const specialMessages = [
       "Wrong-side rider spotted!",
@@ -495,11 +559,13 @@
     }
 
     function startGame() {
+      resumeAudio();
       resetGame();
       gameState = "playing";
       startScreen.classList.add("hidden");
       gameOverScreen.classList.add("hidden");
       lastTime = performance.now();
+      playSound("toggle");
     }
 
     function endGame() {
@@ -527,6 +593,7 @@
       laneStartX = playerX;
       targetPlayerX = laneCenter(playerLane);
       laneSwitchTimer = LANE_SWITCH_TIME;
+      playSound("lane");
     }
 
     function updateHud() {
@@ -538,6 +605,101 @@
       comboEl.textContent = `x${comboMultiplier}`;
     }
 
+    function initAudio() {
+      if (audioContext) return;
+      const AudioCtor = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtor) return;
+
+      audioContext = new AudioCtor();
+      audioMaster = audioContext.createGain();
+      audioMaster.gain.value = muted ? 0 : 0.28;
+      audioMaster.connect(audioContext.destination);
+    }
+
+    function resumeAudio() {
+      initAudio();
+      if (audioContext && audioContext.state === "suspended") {
+        audioContext.resume();
+      }
+    }
+
+    function updateSoundButton() {
+      soundToggle.textContent = muted ? "🔇 Muted" : "🔊 Sound";
+      soundToggle.setAttribute("aria-pressed", String(muted));
+      if (audioMaster) audioMaster.gain.value = muted ? 0 : 0.28;
+    }
+
+    function toggleMute() {
+      resumeAudio();
+      muted = !muted;
+      updateSoundButton();
+      if (!muted) playSound("toggle");
+    }
+
+    function playTone(freq, duration, type, volume, slideTo) {
+      if (muted) return;
+      resumeAudio();
+      if (!audioContext || !audioMaster) return;
+
+      const now = audioContext.currentTime;
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, now);
+      if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, now + duration);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(volume, now + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+      osc.connect(gain);
+      gain.connect(audioMaster);
+      osc.start(now);
+      osc.stop(now + duration + 0.02);
+    }
+
+    function playNoise(duration, volume) {
+      if (muted) return;
+      resumeAudio();
+      if (!audioContext || !audioMaster) return;
+
+      const sampleCount = Math.max(1, Math.floor(audioContext.sampleRate * duration));
+      const buffer = audioContext.createBuffer(1, sampleCount, audioContext.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < sampleCount; i++) {
+        data[i] = (Math.random() * 2 - 1) * (1 - i / sampleCount);
+      }
+
+      const source = audioContext.createBufferSource();
+      const gain = audioContext.createGain();
+      source.buffer = buffer;
+      gain.gain.value = volume;
+      source.connect(gain);
+      gain.connect(audioMaster);
+      source.start();
+    }
+
+    function playSound(name) {
+      if (name === "lane") {
+        playTone(440, 0.07, "square", 0.05, 620);
+      } else if (name === "hit") {
+        playTone(180, 0.18, "sawtooth", 0.08, 72);
+        playNoise(0.12, 0.05);
+      } else if (name === "score") {
+        playTone(660, 0.08, "triangle", 0.04, 880);
+      } else if (name === "skid") {
+        playNoise(0.22, 0.06);
+        playTone(260, 0.18, "sine", 0.035, 180);
+      } else if (name === "warning") {
+        playTone(720, 0.1, "square", 0.045, 720);
+        setTimeout(() => playTone(540, 0.1, "square", 0.04, 540), 120);
+      } else if (name === "peak") {
+        playTone(330, 0.12, "triangle", 0.055, 495);
+        setTimeout(() => playTone(495, 0.12, "triangle", 0.055, 742), 130);
+        setTimeout(() => playTone(742, 0.18, "triangle", 0.06, 990), 260);
+      } else if (name === "toggle") {
+        playTone(520, 0.08, "sine", 0.035, 700);
+      }
+    }
+
     function addChaos(amount) {
       if (peakModeTimer > 0) return;
       chaosMeter = Math.min(100, chaosMeter + amount);
@@ -546,6 +708,7 @@
         messageText = "PEAK BANGALORE MODE";
         messageTimer = 2.2;
         addFloatingText("PEAK BANGALORE MODE", width / 2, height * 0.34, "#facc15");
+        playSound("peak");
         shakeRoad();
       }
     }
@@ -558,6 +721,7 @@
       const points = base * comboMultiplier;
       score += points;
       addFloatingText(`${label} +${points}`, x, y, color);
+      playSound(label === "NEAR MISS" ? "warning" : "score");
       return points;
     }
 
@@ -828,6 +992,7 @@
       cowEventTimer = 1.55;
       messageText = "COW CROSSING!";
       messageTimer = 1.55;
+      playSound("warning");
       return true;
     }
 
@@ -1284,6 +1449,7 @@
           hitTimer = 1.05;
           brakeTimer = 0.55;
           vehicles.splice(i, 1);
+          playSound("hit");
           shakeRoad();
           if (lives <= 0) endGame();
           break;
@@ -1317,6 +1483,7 @@
           messageText = animal.kind === "cow" ? "Holy traffic jam!" : "Careful! Dog on road!";
           messageTimer = 1.6;
           addFloatingText("BRAKE!", playerX, playerY - playerH * 0.7, "#ef4444");
+          playSound("hit");
           shakeRoad();
           if (lives <= 0) endGame();
           break;
@@ -1350,6 +1517,7 @@
           messageText = "Careful! STOP board!";
           messageTimer = 1.6;
           addFloatingText("BRAKE!", playerX, playerY - playerH * 0.7, "#ef4444");
+          playSound("hit");
           shakeRoad();
           if (lives <= 0) endGame();
           break;
@@ -1383,6 +1551,7 @@
             messageText = "Skid!";
             messageTimer = 1.1;
             addSplash(playerX, playerY + playerH * 0.25);
+            playSound("skid");
           } else {
             lives -= 1;
             resetCombo();
@@ -1391,6 +1560,7 @@
             messageText = hazard.kind === "barricade" ? "Metro work ahead!" : "Pothole hit!";
             messageTimer = 1.5;
             addFloatingText("BRAKE!", playerX, playerY - playerH * 0.7, "#ef4444");
+            playSound("hit");
             shakeRoad();
             if (lives <= 0) endGame();
           }
@@ -1422,9 +1592,10 @@
           brakeTimer = 0.8;
           pedestrian.hit = true;
           pedestrians.splice(i, 1);
-          messageText = "Careful! Pedestrian crossing!";
+          messageText = "PEDESTRIAN CROSSING!";
           messageTimer = 1.6;
           addFloatingText("BRAKE!", playerX, playerY - playerH * 0.7, "#ef4444");
+          playSound("hit");
           shakeRoad();
           if (lives <= 0) endGame();
           break;
@@ -2501,6 +2672,9 @@
       } else if (event.key.toLowerCase() === "p") {
         event.preventDefault();
         togglePause();
+      } else if (event.key.toLowerCase() === "m") {
+        event.preventDefault();
+        toggleMute();
       }
     });
 
@@ -2522,8 +2696,13 @@
 
     startButton.addEventListener("click", startGame);
     tryAgainButton.addEventListener("click", startGame);
+    soundToggle.addEventListener("click", event => {
+      event.stopPropagation();
+      toggleMute();
+    });
 
     resizeCanvas();
+    updateSoundButton();
     updateHud();
     draw();
     animationId = requestAnimationFrame(loop);
